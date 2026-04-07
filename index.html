@@ -153,6 +153,7 @@
         icon: "🔴",
         color: "#FF4500",
         description: "Local subreddit posts & tech help requests",
+        url: "https://www.reddit.com/r/longisland/search/?q=computer+repair+OR+IT+services&sort=new",
         subreddits: [
           "longisland", "techsupport", "computerrepair", "buildapc",
           "pcgaming", "iphonehelp", "applehelp", "consolerepair",
@@ -164,55 +165,64 @@
         icon: "📋",
         color: "#8B5CF6",
         description: "Local service requests & wanted posts",
+        url: "https://longisland.craigslist.org/search/sss?query=computer+repair",
         regions: ["longisland", "newyork"]
       },
       nextdoor: {
         name: "Nextdoor / Community",
         icon: "🏘️",
         color: "#10b981",
-        description: "Neighborhood help requests & recommendations"
+        description: "Neighborhood help requests & recommendations",
+        url: "https://nextdoor.com/find-business/computer-repair/shirley-ny/"
       },
       google: {
         name: "Google Business",
         icon: "🔍",
         color: "#4285F4",
-        description: "Local search trends & business queries"
+        description: "Local search trends & business queries",
+        url: "https://trends.google.com/trends/explore?geo=US-NY&q=computer%20repair%20long%20island"
       },
       facebook: {
         name: "Facebook Groups",
         icon: "📘",
         color: "#1877F2",
-        description: "Local community group posts"
+        description: "Local community group posts",
+        url: "https://www.facebook.com/groups/search/groups/?q=long%20island%20computer%20repair"
       },
       yelp: {
         name: "Yelp / Reviews",
         icon: "⭐",
         color: "#D32323",
-        description: "Review sentiment & competitor gaps"
+        description: "Review sentiment & competitor gaps",
+        url: "https://www.yelp.com/search?find_desc=computer+repair&find_loc=Shirley%2C+NY+11967"
       },
       twitter: {
         name: "X / Twitter",
         icon: "🐦",
         color: "#1DA1F2",
-        description: "Local tweets about tech problems"
+        description: "Local tweets about tech problems",
+        url: "https://x.com/search?q=%22computer%20repair%22%20%22long%20island%22&f=live"
       },
       linkedin: {
         name: "LinkedIn",
         icon: "💼",
         color: "#0A66C2",
-        description: "Local businesses seeking IT services"
+        description: "Local businesses seeking IT services",
+        url: "https://www.linkedin.com/search/results/content/?keywords=IT%20services%20suffolk%20county&origin=GLOBAL_SEARCH_HEADER"
       },
       thumbtack: {
         name: "Thumbtack / Angi",
         icon: "📌",
         color: "#009FD9",
-        description: "Service requests from lead platforms"
+        description: "Service requests from lead platforms",
+        url: "https://www.thumbtack.com/ny/shirley/computer-repair/"
       },
       bbb: {
         name: "BBB / Directories",
         icon: "🏢",
         color: "#F59E0B",
-        description: "Business directory listings & inquiries"
+        description: "Business directory listings & inquiries",
+        url: "https://www.bbb.org/search?find_country=US&find_entity=10126-000&find_text=computer+repair&find_loc=Shirley%2C+NY&find_type=Category"
       }
     };
 
@@ -508,7 +518,7 @@
             description: template.desc,
             timestamp,
             isLocal: template.isLocal,
-            url: "#"
+            url: SOURCES[sourceGroup.source]?.url || "#"
           });
         }
       }
@@ -588,10 +598,22 @@
       const priority = getLeadPriority(lead.score);
       const source = SOURCES[lead.source];
       const timeAgo = getTimeAgo(lead.timestamp);
+      const leadUrl = lead.url && lead.url !== "#" ? lead.url : source?.url;
+
+      const handleCardClick = (e) => {
+        // Don't toggle if clicking a button/link
+        if (e.target.closest('button') || e.target.closest('a')) return;
+        setExpanded(!expanded);
+      };
+
+      const handleOpenSource = (e) => {
+        e.stopPropagation();
+        if (leadUrl) window.open(leadUrl, '_blank', 'noopener,noreferrer');
+      };
 
       return (
         <div className="animate-slide-in" style={{
-          background: "var(--bg-card)", border: "1px solid var(--border)",
+          background: "var(--bg-card)", border: lead.isNew ? `1px solid ${source?.color || "var(--accent-blue)"}50` : "1px solid var(--border)",
           borderRadius: 12, padding: "16px 20px", marginBottom: 8,
           borderLeft: `3px solid ${priority.color}`,
           transition: "all 0.2s", cursor: "pointer",
@@ -599,7 +621,7 @@
         }}
         onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-card-hover)"; }}
         onMouseLeave={e => { e.currentTarget.style.background = "var(--bg-card)"; }}
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleCardClick}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -610,6 +632,7 @@
                 {lead.serviceCategory && lead.serviceCategory !== "General Tech" && (
                   <Badge color="var(--accent-cyan)" bg="rgba(6,182,212,0.15)">{lead.serviceCategory}</Badge>
                 )}
+                {lead.isNew && <Badge color="var(--accent-green)" bg="rgba(16,185,129,0.15)">NEW</Badge>}
               </div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, lineHeight: 1.4 }}>
                 {lead.title}
@@ -624,40 +647,70 @@
                 {lead.isLocal && <span style={{ fontSize: 11, color: "var(--accent-green)" }}>📍 Local</span>}
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+              {leadUrl && (
+                <a href={leadUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+                  padding: "5px 12px", borderRadius: 6, border: `1px solid ${source?.color || "var(--accent-blue)"}`,
+                  background: `${source?.color || "var(--accent-blue)"}20`,
+                  color: source?.color || "var(--accent-blue)",
+                  cursor: "pointer", fontSize: 11, fontWeight: 600, textAlign: "center",
+                  textDecoration: "none", whiteSpace: "nowrap"
+                }}>↗ Open Source</a>
+              )}
               {lead.status !== "contacted" && (
-                <button onClick={() => onStatusChange(lead.id, "contacted")} style={{
+                <button onClick={(e) => { e.stopPropagation(); onStatusChange(lead.id, "contacted"); }} style={{
                   padding: "5px 12px", borderRadius: 6, border: "1px solid var(--accent-green)",
                   background: "rgba(16,185,129,0.1)", color: "var(--accent-green)",
                   cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap"
                 }}>✓ Contacted</button>
               )}
               {lead.status !== "saved" && lead.status !== "contacted" && (
-                <button onClick={() => onStatusChange(lead.id, "saved")} style={{
+                <button onClick={(e) => { e.stopPropagation(); onStatusChange(lead.id, "saved"); }} style={{
                   padding: "5px 12px", borderRadius: 6, border: "1px solid var(--accent-blue)",
                   background: "rgba(59,130,246,0.1)", color: "var(--accent-blue)",
                   cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap"
                 }}>★ Save</button>
               )}
-              <button onClick={() => onDismiss(lead.id)} style={{
+              <button onClick={(e) => { e.stopPropagation(); onDismiss(lead.id); }} style={{
                 padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)",
                 background: "transparent", color: "var(--text-muted)",
                 cursor: "pointer", fontSize: 11, fontWeight: 500
               }}>✕ Hide</button>
-              {lead.url && lead.url !== "#" && (
-                <a href={lead.url} target="_blank" rel="noopener noreferrer" style={{
-                  padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)",
-                  background: "transparent", color: "var(--text-secondary)",
-                  cursor: "pointer", fontSize: 11, fontWeight: 500, textAlign: "center",
-                  textDecoration: "none"
-                }} onClick={e => e.stopPropagation()}>↗ Open</a>
-              )}
             </div>
           </div>
 
-          {expanded && lead.status === "contacted" && (
-            <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(16,185,129,0.1)", borderRadius: 8, fontSize: 12, color: "var(--accent-green)" }}>
-              ✓ Marked as contacted
+          {/* Expanded detail panel */}
+          {expanded && (
+            <div style={{ marginTop: 12, padding: "12px 16px", background: "var(--bg-secondary)", borderRadius: 8, border: "1px solid var(--border)" }}>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 10 }}>
+                {lead.description}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {leadUrl && (
+                  <a href={leadUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+                    padding: "6px 16px", borderRadius: 6,
+                    background: source?.color || "var(--accent-blue)",
+                    color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                    textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4
+                  }}>↗ Go to {source?.name || "Source"}</a>
+                )}
+                {lead.serviceCategory && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", padding: "4px 10px", background: "var(--bg-card)", borderRadius: 6 }}>
+                    🏷 {lead.serviceCategory}
+                  </span>
+                )}
+                {lead.firstSeen && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    First seen: {new Date(lead.firstSeen).toLocaleDateString()}
+                  </span>
+                )}
+                {lead.status === "contacted" && (
+                  <span style={{ fontSize: 11, color: "var(--accent-green)", fontWeight: 600 }}>✓ Contacted</span>
+                )}
+                {lead.status === "saved" && (
+                  <span style={{ fontSize: 11, color: "var(--accent-blue)", fontWeight: 600 }}>★ Saved</span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -679,8 +732,41 @@
     // ============================================================
     // MAIN APP
     // ============================================================
+    // ============================================================
+    // LOCAL STORAGE PERSISTENCE
+    // ============================================================
+    const STORAGE_KEY = "battlegrounds_leads";
+    const STORAGE_META_KEY = "battlegrounds_meta";
+
+    function saveLeadsToStorage(leads) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+      } catch (e) { console.log("Storage save error:", e.message); }
+    }
+
+    function loadLeadsFromStorage() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+      } catch (e) { return []; }
+    }
+
+    function saveMetaToStorage(meta) {
+      try {
+        localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
+      } catch (e) {}
+    }
+
+    function loadMetaFromStorage() {
+      try {
+        const data = localStorage.getItem(STORAGE_META_KEY);
+        return data ? JSON.parse(data) : { totalFetched: 0 };
+      } catch (e) { return { totalFetched: 0 }; }
+    }
+
     function App() {
-      const [leads, setLeads] = useState([]);
+      const savedMeta = loadMetaFromStorage();
+      const [leads, setLeads] = useState(() => loadLeadsFromStorage());
       const [loading, setLoading] = useState(true);
       const [lastRefresh, setLastRefresh] = useState(null);
       const [nextRefresh, setNextRefresh] = useState(null);
@@ -692,9 +778,21 @@
       const [sortBy, setSortBy] = useState("score");
       const [fetchLog, setFetchLog] = useState([]);
       const [showSettings, setShowSettings] = useState(false);
-      const [totalFetched, setTotalFetched] = useState(0);
+      const [totalFetched, setTotalFetched] = useState(savedMeta.totalFetched || 0);
       const timerRef = useRef(null);
       const countdownRef = useRef(null);
+
+      // Persist leads to localStorage whenever they change
+      useEffect(() => {
+        if (leads.length > 0) {
+          saveLeadsToStorage(leads);
+        }
+      }, [leads]);
+
+      // Persist meta
+      useEffect(() => {
+        saveMetaToStorage({ totalFetched });
+      }, [totalFetched]);
 
       // Fetch all leads from all sources
       const fetchAllLeads = useCallback(async () => {
@@ -754,23 +852,33 @@
           status: "new"
         }));
 
-        // Merge with existing leads (preserve status)
+        // Merge: keep ALL existing leads, add new unique ones, preserve statuses
         setLeads(prevLeads => {
           const existingMap = new Map(prevLeads.map(l => [l.id, l]));
-          const merged = scoredLeads.map(newLead => {
+          let newCount = 0;
+
+          // Update existing leads with fresh data but preserve status
+          for (const newLead of scoredLeads) {
             const existing = existingMap.get(newLead.id);
             if (existing) {
-              return { ...newLead, status: existing.status };
-            }
-            return newLead;
-          });
-          // Also keep leads that no longer appear but were saved/contacted
-          for (const [id, lead] of existingMap) {
-            if (!merged.find(l => l.id === id) && (lead.status === "saved" || lead.status === "contacted")) {
-              merged.push(lead);
+              // Keep existing status, update score/timestamp
+              existingMap.set(newLead.id, { ...newLead, status: existing.status, firstSeen: existing.firstSeen || existing.timestamp });
+            } else {
+              // Brand new lead
+              existingMap.set(newLead.id, { ...newLead, firstSeen: newLead.timestamp, isNew: true });
+              newCount++;
             }
           }
-          return merged;
+
+          // Clear isNew flag from previous leads
+          for (const [id, lead] of existingMap) {
+            if (lead.isNew && !scoredLeads.find(sl => sl.id === id)) {
+              existingMap.set(id, { ...lead, isNew: false });
+            }
+          }
+
+          console.log(`Refresh complete: ${newCount} new leads added, ${existingMap.size} total`);
+          return Array.from(existingMap.values());
         });
 
         setTotalFetched(prev => prev + allNewLeads.length);
@@ -929,7 +1037,7 @@
             <StatCard label="Hot Leads" value={stats.hot} icon="🔥" color="var(--accent-red)" subtext="Score 70+" />
             <StatCard label="Warm Leads" value={stats.warm} icon="☀️" color="var(--accent-yellow)" subtext="Score 45-69" />
             <StatCard label="Contacted" value={stats.contacted} icon="✅" color="var(--accent-green)" subtext={`${stats.saved} saved`} />
-            <StatCard label="Sources Active" value={Object.keys(SOURCES).length} icon="🌐" color="var(--accent-purple)" subtext="10 sources scanning" />
+            <StatCard label="Sources Active" value={Object.keys(SOURCES).length} icon="🌐" color="var(--accent-purple)" subtext="All leads persisted" />
           </div>
 
           {/* Source Filters */}
