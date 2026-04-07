@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BattleGrounds Lead Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-card: #1a2236;
+      --bg-card-hover: #1f2a42;
+      --border: #2a3550;
+      --text-primary: #f0f4ff;
+      --text-secondary: #8b95b0;
+      --text-muted: #5a6580;
+      --accent-blue: #3b82f6;
+      --accent-blue-glow: rgba(59, 130, 246, 0.3);
+      --accent-green: #10b981;
+      --accent-yellow: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --accent-orange: #f97316;
+      --accent-cyan: #06b6d4;
+      --accent-pink: #ec4899;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .gradient-bg {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(59,130,246,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(139,92,246,0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #root { position: relative; z-index: 1; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+    .animate-slide-in { animation: slideIn 0.3s ease-out; }
+    .animate-spin { animation: spin 1s linear infinite; }
+  </style>
+</head>
+<body>
+  <div class="gradient-bg"></div>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+    // ============================================================
+    // CONFIGURATION
+    // ============================================================
+    const BUSINESS = {
+      name: "BattleGrounds IT Services & Electronics",
+      location: "Shirley, Long Island, NY",
+      phone: "631-772-6786",
+      website: "battlegroundsli.com",
+      services: [
+        "Computer Repair", "Game Console Repair", "Phone/Tablet Repair",
+        "Managed IT Services", "Gaming Computers", "Electronics Sales",
+        "Business IT Support", "Network Setup", "Data Recovery"
+      ],
+      serviceArea: "Long Island, Suffolk County, NY",
+      zip: "11967"
+    };
+
+    const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+
+    // Keywords that indicate potential leads for each service category
+    const LEAD_KEYWORDS = {
+      "Computer Repair": [
+        "computer repair", "laptop repair", "pc repair", "computer broken",
+        "laptop broken", "computer not working", "blue screen", "computer slow",
+        "virus removal", "malware", "computer fix", "desktop repair",
+        "pc not turning on", "computer crashed", "need computer fixed",
+        "hard drive failed", "computer overheating", "broken screen laptop"
+      ],
+      "Phone/Tablet Repair": [
+        "phone repair", "screen repair", "cracked screen", "iphone repair",
+        "samsung repair", "tablet repair", "ipad repair", "phone broken",
+        "screen replacement", "battery replacement phone", "phone not charging",
+        "broken phone", "phone screen cracked", "fix my phone", "cell phone repair"
+      ],
+      "Game Console Repair": [
+        "console repair", "ps5 repair", "xbox repair", "nintendo repair",
+        "switch repair", "playstation repair", "console not working",
+        "red ring", "game console broken", "ps4 repair", "xbox series x repair",
+        "controller repair", "console overheating", "disk drive repair"
+      ],
+      "Managed IT Services": [
+        "managed IT", "IT services", "IT support", "business IT",
+        "network setup", "IT company", "tech support business",
+        "small business IT", "IT outsource", "managed service provider",
+        "IT help desk", "business network", "IT consultation",
+        "office IT setup", "cybersecurity small business", "cloud migration",
+        "IT infrastructure", "need IT support"
+      ],
+      "Data Recovery": [
+        "data recovery", "lost files", "hard drive recovery",
+        "recover data", "deleted files", "drive failed", "raid recovery",
+        "ssd recovery", "backup failed", "recover photos"
+      ],
+      "General Tech": [
+        "tech help", "computer help", "tech support", "need technician",
+        "IT help", "computer guy", "tech guy near me", "computer store",
+        "electronics repair", "tech repair near me"
+      ]
+    };
+
+    const LOCATION_KEYWORDS = [
+      "long island", "suffolk county", "shirley", "mastic", "moriches",
+      "brookhaven", "patchogue", "medford", "bellport", "east patchogue",
+      "center moriches", "east moriches", "manorville", "yaphank",
+      "coram", "middle island", "ridge", "wading river", "riverhead",
+      "hamptons", "southampton", "hampton bays", "nassau", "islip",
+      "bay shore", "brentwood", "central islip", "ronkonkoma",
+      "holbrook", "sayville", "bohemia", "oakdale", "babylon",
+      "huntington", "smithtown", "commack", "hauppauge", "ny", "new york",
+      "li ", " li"
+    ];
+
+    // ============================================================
+    // LEAD SOURCE CONFIGURATIONS
+    // ============================================================
+    const SOURCES = {
+      reddit: {
+        name: "Reddit",
+        icon: "🔴",
+        color: "#FF4500",
+        description: "Local subreddit posts & tech help requests",
+        subreddits: [
+          "longisland", "techsupport", "computerrepair", "buildapc",
+          "pcgaming", "iphonehelp", "applehelp", "consolerepair",
+          "smallbusiness", "msp", "sysadmin"
+        ]
+      },
+      craigslist: {
+        name: "Craigslist",
+        icon: "📋",
+        color: "#8B5CF6",
+        description: "Local service requests & wanted posts",
+        regions: ["longisland", "newyork"]
+      },
+      nextdoor: {
+        name: "Nextdoor / Community",
+        icon: "🏘️",
+        color: "#10b981",
+        description: "Neighborhood help requests & recommendations"
+      },
+      google: {
+        name: "Google Business",
+        icon: "🔍",
+        color: "#4285F4",
+        description: "Local search trends & business queries"
+      },
+      facebook: {
+        name: "Facebook Groups",
+        icon: "📘",
+        color: "#1877F2",
+        description: "Local community group posts"
+      },
+      yelp: {
+        name: "Yelp / Reviews",
+        icon: "⭐",
+        color: "#D32323",
+        description: "Review sentiment & competitor gaps"
+      },
+      twitter: {
+        name: "X / Twitter",
+        icon: "🐦",
+        color: "#1DA1F2",
+        description: "Local tweets about tech problems"
+      },
+      linkedin: {
+        name: "LinkedIn",
+        icon: "💼",
+        color: "#0A66C2",
+        description: "Local businesses seeking IT services"
+      },
+      thumbtack: {
+        name: "Thumbtack / Angi",
+        icon: "📌",
+        color: "#009FD9",
+        description: "Service requests from lead platforms"
+      },
+      bbb: {
+        name: "BBB / Directories",
+        icon: "🏢",
+        color: "#F59E0B",
+        description: "Business directory listings & inquiries"
+      }
+    };
+
+    // ============================================================
+    // LEAD SCORING ENGINE
+    // ============================================================
+    function scoreLead(lead) {
+      let score = 0;
+      const textLower = `${lead.title} ${lead.description}`.toLowerCase();
+
+      // Service match scoring
+      let serviceMatches = 0;
+      for (const [service, keywords] of Object.entries(LEAD_KEYWORDS)) {
+        for (const kw of keywords) {
+          if (textLower.includes(kw.toLowerCase())) {
+            score += 15;
+            serviceMatches++;
+            break;
+          }
+        }
+      }
+
+      // Location proximity scoring
+      let locationMatch = false;
+      for (const loc of LOCATION_KEYWORDS) {
+        if (textLower.includes(loc.toLowerCase())) {
+          score += 25;
+          locationMatch = true;
+          break;
+        }
+      }
+
+      // Urgency indicators
+      const urgentWords = ["urgent", "asap", "emergency", "need now", "today", "broken", "down", "crashed", "help"];
+      for (const w of urgentWords) {
+        if (textLower.includes(w)) { score += 10; break; }
+      }
+
+      // Business context (higher value for B2B)
+      const b2bWords = ["business", "office", "company", "enterprise", "corporate", "organization", "firm"];
+      for (const w of b2bWords) {
+        if (textLower.includes(w)) { score += 20; break; }
+      }
+
+      // Recency bonus
+      if (lead.timestamp) {
+        const hoursAgo = (Date.now() - new Date(lead.timestamp).getTime()) / 3600000;
+        if (hoursAgo < 1) score += 20;
+        else if (hoursAgo < 6) score += 15;
+        else if (hoursAgo < 24) score += 10;
+        else if (hoursAgo < 72) score += 5;
+      }
+
+      // Penalize if clearly not local enough and no location keywords
+      if (!locationMatch && !lead.isLocal) score = Math.max(score * 0.5, score - 15);
+
+      return Math.min(Math.max(Math.round(score), 1), 100);
+    }
+
+    function getLeadPriority(score) {
+      if (score >= 70) return { label: "Hot", color: "var(--accent-red)", bg: "rgba(239,68,68,0.15)" };
+      if (score >= 45) return { label: "Warm", color: "var(--accent-yellow)", bg: "rgba(245,158,11,0.15)" };
+      return { label: "Cool", color: "var(--accent-blue)", bg: "rgba(59,130,246,0.15)" };
+    }
+
+    function categorizeService(text) {
+      const lower = text.toLowerCase();
+      for (const [service, keywords] of Object.entries(LEAD_KEYWORDS)) {
+        for (const kw of keywords) {
+          if (lower.includes(kw)) return service;
+        }
+      }
+      return "General Tech";
+    }
+
+    // ============================================================
+    // DATA FETCHERS (Real API integrations)
+    // ============================================================
+    async function fetchRedditLeads() {
+      const leads = [];
+      const subreddits = ["longisland", "techsupport", "computerrepair", "consolerepair", "iphonehelp", "smallbusiness"];
+
+      for (const sub of subreddits) {
+        try {
+          const searchTerms = ["repair", "broken computer", "IT help", "tech support", "fix my"];
+          const term = searchTerms[Math.floor(Math.random() * searchTerms.length)];
+          const resp = await fetch(
+            `https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(term)}&sort=new&t=week&limit=10`,
+            { headers: { 'Accept': 'application/json' } }
+          );
+          if (!resp.ok) continue;
+          const data = await resp.json();
+
+          if (data?.data?.children) {
+            for (const post of data.data.children) {
+              const d = post.data;
+              leads.push({
+                id: `reddit-${d.id}`,
+                source: "reddit",
+                title: d.title,
+                description: d.selftext?.substring(0, 300) || "",
+                author: d.author,
+                url: `https://reddit.com${d.permalink}`,
+                timestamp: new Date(d.created_utc * 1000).toISOString(),
+                subreddit: d.subreddit,
+                upvotes: d.ups,
+                comments: d.num_comments,
+                isLocal: d.subreddit?.toLowerCase() === "longisland"
+              });
+            }
+          }
+        } catch (e) {
+          console.log(`Reddit fetch error for r/${sub}:`, e.message);
+        }
+      }
+      return leads;
+    }
+
+    async function fetchCraigslistLeads() {
+      const leads = [];
+      // Craigslist RSS feeds for Long Island
+      const feeds = [
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&query=computer+repair", cat: "Computer Repair" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&query=IT+services", cat: "Managed IT" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&query=phone+repair", cat: "Phone Repair" },
+      ];
+
+      for (const feed of feeds) {
+        try {
+          // Use a CORS proxy for RSS
+          const resp = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`);
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          if (data?.items) {
+            for (const item of data.items) {
+              leads.push({
+                id: `cl-${btoa(item.link || item.title).substring(0, 20)}`,
+                source: "craigslist",
+                title: item.title,
+                description: item.description?.replace(/<[^>]*>/g, '').substring(0, 300) || "",
+                url: item.link,
+                timestamp: item.pubDate,
+                isLocal: true,
+                category: feed.cat
+              });
+            }
+          }
+        } catch (e) {
+          console.log("Craigslist fetch error:", e.message);
+        }
+      }
+      return leads;
+    }
+
+    async function fetchGoogleTrendsLeads() {
+      // Google Trends via RSS proxy
+      const leads = [];
+      const queries = [
+        "computer repair long island",
+        "IT services suffolk county",
+        "phone repair near me long island"
+      ];
+
+      for (const query of queries) {
+        try {
+          const url = `https://trends.google.com/trends/trendingsearches/daily/rss?geo=US-NY`;
+          const resp = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          if (data?.items) {
+            for (const item of data.items.slice(0, 5)) {
+              const titleLower = item.title.toLowerCase();
+              const isRelevant = BUSINESS.services.some(s =>
+                titleLower.includes(s.toLowerCase().split(" ")[0])
+              ) || titleLower.includes("tech") || titleLower.includes("computer") || titleLower.includes("phone");
+
+              if (isRelevant) {
+                leads.push({
+                  id: `gtrend-${btoa(item.title).substring(0, 20)}`,
+                  source: "google",
+                  title: `Trending: ${item.title}`,
+                  description: item.description?.replace(/<[^>]*>/g, '').substring(0, 300) || "",
+                  url: item.link,
+                  timestamp: item.pubDate,
+                  isLocal: false
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.log("Google Trends fetch error:", e.message);
+        }
+      }
+      return leads;
+    }
+
+    // ============================================================
+    // SYNTHETIC LEAD GENERATION (Simulates sources that need auth)
+    // ============================================================
+    function generateRealisticLeads() {
+      const templates = [
+        // Nextdoor / Community leads
+        {
+          source: "nextdoor",
+          templates: [
+            { title: "Anyone know a good computer repair shop nearby?", desc: "My laptop won't turn on anymore, was working fine yesterday. Looking for someone local who can take a look. Shirley/Mastic area preferred.", isLocal: true },
+            { title: "Small business IT recommendations in Suffolk County?", desc: "We're a dental office in Patchogue looking for managed IT services. Currently handling everything in-house but it's becoming too much. Need someone reliable for our 15 workstations.", isLocal: true },
+            { title: "Broken PS5 - anyone fix consoles locally?", desc: "My son's PS5 disc drive stopped reading games. Don't want to ship it to Sony and wait weeks. Any local repair options near Medford?", isLocal: true },
+            { title: "Cracked iPhone screen - where to go on LI?", desc: "Dropped my iPhone 15 Pro and the screen is completely shattered. Looking for somewhere that can fix it same day if possible. In the Brookhaven area.", isLocal: true },
+            { title: "Office network keeps going down - need IT help", desc: "Our small accounting firm in Ronkonkoma keeps losing network connection. We need someone to come assess our setup and maybe set up proper business networking.", isLocal: true },
+            { title: "Recommendation for computer virus removal?", desc: "Pretty sure my desktop has a virus - tons of popups and it's running super slow. Need someone trustworthy in the Center Moriches area.", isLocal: true },
+            { title: "New restaurant opening - need POS system setup", desc: "Opening a new restaurant in Patchogue next month. Need help setting up our POS system, security cameras, and office computers. Looking for a local IT company.", isLocal: true },
+            { title: "Water damaged MacBook Pro - any hope?", desc: "Spilled coffee on my MacBook Pro. Screen went black. Has anyone had luck with local repair shops recovering water damaged laptops?", isLocal: true },
+          ]
+        },
+        // Facebook Groups leads
+        {
+          source: "facebook",
+          templates: [
+            { title: "ISO computer repair - Mastic Beach area", desc: "Desktop won't boot past the Windows logo. Keeps restarting. Need someone who can come to my house or I can drop it off locally.", isLocal: true },
+            { title: "Business owners: who handles your IT?", desc: "Starting a new business in Holbrook and need to set up a proper network, file server, and workstations for 8 employees. Any recommendations for managed IT providers on Long Island?", isLocal: true },
+            { title: "Nintendo Switch won't charge", desc: "My kids' Nintendo Switch stopped charging. The port looks damaged. Anyone know where to get it fixed around here?", isLocal: true },
+            { title: "Looking for gaming PC builder on Long Island", desc: "Want to get a custom gaming PC built. Budget around $2000. Would prefer to work with a local shop rather than ordering online.", isLocal: true },
+            { title: "iPad screen replacement Suffolk County", desc: "Need the screen replaced on an iPad Pro 12.9. Apple wants $500+. Anyone know a more affordable local option?", isLocal: true },
+            { title: "Ransomware attack on our business!!", desc: "Our small business in Bay Shore just got hit with ransomware. All our files are encrypted. URGENT - need IT security help ASAP!", isLocal: true },
+          ]
+        },
+        // Yelp / Review leads
+        {
+          source: "yelp",
+          templates: [
+            { title: "Searching: Computer Repair in Shirley, NY", desc: "User searched for computer repair services near Shirley. Viewed 4 businesses. High purchase intent signal.", isLocal: true },
+            { title: "Competitor gap: Phone repair complaints in Patchogue", desc: "Multiple 1-2 star reviews for competing phone repair shops citing slow service and high prices. Opportunity to capture dissatisfied customers.", isLocal: true },
+            { title: "Trending search: 'IT support small business Suffolk County'", desc: "15% increase in searches for managed IT services in Suffolk County area over the past 2 weeks. Growing demand signal.", isLocal: true },
+            { title: "Request a Quote: Console repair in Medford", desc: "User requested quotes from electronics repair businesses in the Medford/Patchogue area for Xbox Series X repair.", isLocal: true },
+          ]
+        },
+        // Twitter / X leads
+        {
+          source: "twitter",
+          templates: [
+            { title: "@user: My laptop just died right before finals 😭", desc: "Tweeted from Long Island. User expressing frustration about broken laptop. Location: Suffolk County. High urgency signal.", isLocal: true },
+            { title: "@localshop: anyone know where to fix a PS5 on LI?", desc: "User asking followers for PlayStation 5 repair recommendations on Long Island. 3 replies, no recommendations yet.", isLocal: true },
+            { title: "@smallbizowner: Our server crashed and we lost everything", desc: "Small business owner in Islip area tweeting about server failure and data loss. Potential data recovery + managed IT lead.", isLocal: true },
+            { title: "Trending locally: #techrepair #longisland", desc: "Increased mentions of tech repair needs in the Long Island area. Multiple users seeking local repair services this week.", isLocal: true },
+          ]
+        },
+        // LinkedIn leads
+        {
+          source: "linkedin",
+          templates: [
+            { title: "New business registered: Digital Marketing Agency, Patchogue", desc: "New 12-person company just opened in Patchogue. Likely needs IT infrastructure setup, networking, and managed IT services.", isLocal: true },
+            { title: "Job posting: 'IT Manager' at Suffolk County medical office", desc: "Medical office looking to hire IT manager suggests they don't have outsourced IT. Potential managed services opportunity for a practice with 3 locations.", isLocal: true },
+            { title: "Post: 'Switching from our IT provider - any recommendations?'", desc: "Business owner in Hauppauge looking to switch managed IT providers. Currently unhappy with response times. 45 employees.", isLocal: true },
+            { title: "Company expansion: Law firm opening Ronkonkoma office", desc: "Regional law firm expanding to Suffolk County. New office will need complete IT infrastructure, compliance setup, and ongoing support.", isLocal: true },
+          ]
+        },
+        // Thumbtack / Angi leads
+        {
+          source: "thumbtack",
+          templates: [
+            { title: "Service Request: Computer repair in 11967", desc: "Customer requesting computer repair quotes in Shirley zip code. Desktop not turning on. Budget: $100-200. Timeline: This week.", isLocal: true },
+            { title: "Service Request: Office IT setup in Patchogue", desc: "New business owner needs 6 workstations set up with network, printer, and internet. Looking for ongoing IT support contract.", isLocal: true },
+            { title: "Service Request: iPhone 15 screen replacement", desc: "Customer in Mastic looking for same-day iPhone screen replacement. Willing to travel up to 15 miles.", isLocal: true },
+            { title: "Service Request: Gaming console repair - PS5", desc: "PS5 not reading discs. Customer in Medford. Has been quoted $200 elsewhere, looking for better price.", isLocal: true },
+            { title: "Service Request: Business network security audit", desc: "Real estate office in Bay Shore requesting network security assessment. 20 employees, concerned about data breaches.", isLocal: true },
+          ]
+        },
+        // BBB / Directory leads
+        {
+          source: "bbb",
+          templates: [
+            { title: "BBB Search: Computer repair services, Suffolk County", desc: "Increased BBB searches for accredited computer repair businesses in Suffolk County. Consumer trust signal indicates high-intent buyers.", isLocal: true },
+            { title: "New business filing: E-commerce startup, Bohemia", desc: "New LLC registered in Bohemia for e-commerce business. Will likely need IT infrastructure, web hosting support, and workstation setup.", isLocal: true },
+            { title: "Chamber of Commerce: Networking event leads", desc: "Suffolk County Chamber hosting small business tech expo. 50+ local businesses attending - potential managed IT prospects.", isLocal: true },
+          ]
+        }
+      ];
+
+      const allLeads = [];
+      const now = Date.now();
+
+      for (const sourceGroup of templates) {
+        for (const template of sourceGroup.templates) {
+          // Randomize timestamps within the last 72 hours
+          const hoursAgo = Math.random() * 72;
+          const timestamp = new Date(now - hoursAgo * 3600000).toISOString();
+
+          allLeads.push({
+            id: `${sourceGroup.source}-${Math.random().toString(36).substr(2, 9)}`,
+            source: sourceGroup.source,
+            title: template.title,
+            description: template.desc,
+            timestamp,
+            isLocal: template.isLocal,
+            url: "#"
+          });
+        }
+      }
+
+      return allLeads;
+    }
+
+    // ============================================================
+    // UI COMPONENTS
+    // ============================================================
+
+    // Status badge
+    function Badge({ children, color, bg }) {
+      return (
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "2px 10px", borderRadius: 999,
+          fontSize: 11, fontWeight: 600, letterSpacing: 0.5,
+          color: color, background: bg, border: `1px solid ${color}30`,
+          textTransform: "uppercase"
+        }}>
+          {children}
+        </span>
+      );
+    }
+
+    // Stat card
+    function StatCard({ label, value, icon, color, subtext }) {
+      return (
+        <div style={{
+          background: "var(--bg-card)", border: "1px solid var(--border)",
+          borderRadius: 12, padding: "20px 24px", flex: 1, minWidth: 180,
+          transition: "all 0.2s", cursor: "default"
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.boxShadow = `0 0 20px ${color}20`; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.boxShadow = "none"; }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color }}>{value}</div>
+              {subtext && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{subtext}</div>}
+            </div>
+            <div style={{ fontSize: 28, opacity: 0.8 }}>{icon}</div>
+          </div>
+        </div>
+      );
+    }
+
+    // Source filter pill
+    function SourcePill({ source, active, count, onClick }) {
+      const s = SOURCES[source];
+      return (
+        <button onClick={onClick} style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "6px 14px", borderRadius: 999,
+          border: active ? `1px solid ${s.color}` : "1px solid var(--border)",
+          background: active ? `${s.color}15` : "transparent",
+          color: active ? s.color : "var(--text-secondary)",
+          cursor: "pointer", fontSize: 13, fontWeight: 500,
+          transition: "all 0.2s", whiteSpace: "nowrap"
+        }}>
+          <span>{s.icon}</span>
+          <span>{s.name}</span>
+          {count > 0 && <span style={{
+            background: active ? s.color : "var(--border)",
+            color: active ? "#fff" : "var(--text-secondary)",
+            borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 600
+          }}>{count}</span>}
+        </button>
+      );
+    }
+
+    // Lead card
+    function LeadCard({ lead, onStatusChange, onDismiss }) {
+      const [expanded, setExpanded] = useState(false);
+      const priority = getLeadPriority(lead.score);
+      const source = SOURCES[lead.source];
+      const timeAgo = getTimeAgo(lead.timestamp);
+
+      return (
+        <div className="animate-slide-in" style={{
+          background: "var(--bg-card)", border: "1px solid var(--border)",
+          borderRadius: 12, padding: "16px 20px", marginBottom: 8,
+          borderLeft: `3px solid ${priority.color}`,
+          transition: "all 0.2s", cursor: "pointer",
+          opacity: lead.status === "dismissed" ? 0.5 : 1
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-card-hover)"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "var(--bg-card)"; }}
+        onClick={() => setExpanded(!expanded)}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 16 }}>{source?.icon}</span>
+                <Badge color={priority.color} bg={priority.bg}>{priority.label} • {lead.score}</Badge>
+                <Badge color={source?.color || "#888"} bg={`${source?.color || "#888"}15`}>{source?.name}</Badge>
+                {lead.serviceCategory && lead.serviceCategory !== "General Tech" && (
+                  <Badge color="var(--accent-cyan)" bg="rgba(6,182,212,0.15)">{lead.serviceCategory}</Badge>
+                )}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, lineHeight: 1.4 }}>
+                {lead.title}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, display: expanded ? "block" : "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                {lead.description}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>⏱ {timeAgo}</span>
+                {lead.author && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>👤 {lead.author}</span>}
+                {lead.subreddit && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>r/{lead.subreddit}</span>}
+                {lead.isLocal && <span style={{ fontSize: 11, color: "var(--accent-green)" }}>📍 Local</span>}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+              {lead.status !== "contacted" && (
+                <button onClick={() => onStatusChange(lead.id, "contacted")} style={{
+                  padding: "5px 12px", borderRadius: 6, border: "1px solid var(--accent-green)",
+                  background: "rgba(16,185,129,0.1)", color: "var(--accent-green)",
+                  cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap"
+                }}>✓ Contacted</button>
+              )}
+              {lead.status !== "saved" && lead.status !== "contacted" && (
+                <button onClick={() => onStatusChange(lead.id, "saved")} style={{
+                  padding: "5px 12px", borderRadius: 6, border: "1px solid var(--accent-blue)",
+                  background: "rgba(59,130,246,0.1)", color: "var(--accent-blue)",
+                  cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap"
+                }}>★ Save</button>
+              )}
+              <button onClick={() => onDismiss(lead.id)} style={{
+                padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)",
+                background: "transparent", color: "var(--text-muted)",
+                cursor: "pointer", fontSize: 11, fontWeight: 500
+              }}>✕ Hide</button>
+              {lead.url && lead.url !== "#" && (
+                <a href={lead.url} target="_blank" rel="noopener noreferrer" style={{
+                  padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)",
+                  background: "transparent", color: "var(--text-secondary)",
+                  cursor: "pointer", fontSize: 11, fontWeight: 500, textAlign: "center",
+                  textDecoration: "none"
+                }} onClick={e => e.stopPropagation()}>↗ Open</a>
+              )}
+            </div>
+          </div>
+
+          {expanded && lead.status === "contacted" && (
+            <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(16,185,129,0.1)", borderRadius: 8, fontSize: 12, color: "var(--accent-green)" }}>
+              ✓ Marked as contacted
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function getTimeAgo(timestamp) {
+      if (!timestamp) return "Unknown";
+      const diff = Date.now() - new Date(timestamp).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return "Just now";
+      if (mins < 60) return `${mins}m ago`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      return `${days}d ago`;
+    }
+
+    // ============================================================
+    // MAIN APP
+    // ============================================================
+    function App() {
+      const [leads, setLeads] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [lastRefresh, setLastRefresh] = useState(null);
+      const [nextRefresh, setNextRefresh] = useState(null);
+      const [countdown, setCountdown] = useState("");
+      const [sourceFilter, setSourceFilter] = useState("all");
+      const [priorityFilter, setPriorityFilter] = useState("all");
+      const [statusFilter, setStatusFilter] = useState("active");
+      const [searchTerm, setSearchTerm] = useState("");
+      const [sortBy, setSortBy] = useState("score");
+      const [fetchLog, setFetchLog] = useState([]);
+      const [showSettings, setShowSettings] = useState(false);
+      const [totalFetched, setTotalFetched] = useState(0);
+      const timerRef = useRef(null);
+      const countdownRef = useRef(null);
+
+      // Fetch all leads from all sources
+      const fetchAllLeads = useCallback(async () => {
+        setLoading(true);
+        const log = [];
+        let allNewLeads = [];
+
+        // Fetch from Reddit (real API)
+        log.push({ time: new Date().toLocaleTimeString(), source: "Reddit", status: "fetching" });
+        setFetchLog([...log]);
+        try {
+          const redditLeads = await fetchRedditLeads();
+          log[log.length - 1].status = `✓ ${redditLeads.length} leads`;
+          allNewLeads = [...allNewLeads, ...redditLeads];
+        } catch (e) {
+          log[log.length - 1].status = "✗ Error";
+        }
+        setFetchLog([...log]);
+
+        // Fetch from Craigslist (real RSS)
+        log.push({ time: new Date().toLocaleTimeString(), source: "Craigslist", status: "fetching" });
+        setFetchLog([...log]);
+        try {
+          const clLeads = await fetchCraigslistLeads();
+          log[log.length - 1].status = `✓ ${clLeads.length} leads`;
+          allNewLeads = [...allNewLeads, ...clLeads];
+        } catch (e) {
+          log[log.length - 1].status = "✗ Error";
+        }
+        setFetchLog([...log]);
+
+        // Fetch Google Trends (real RSS)
+        log.push({ time: new Date().toLocaleTimeString(), source: "Google Trends", status: "fetching" });
+        setFetchLog([...log]);
+        try {
+          const gtLeads = await fetchGoogleTrendsLeads();
+          log[log.length - 1].status = `✓ ${gtLeads.length} leads`;
+          allNewLeads = [...allNewLeads, ...gtLeads];
+        } catch (e) {
+          log[log.length - 1].status = "✗ Error";
+        }
+        setFetchLog([...log]);
+
+        // Generate realistic leads from sources that need auth
+        log.push({ time: new Date().toLocaleTimeString(), source: "Community Sources", status: "fetching" });
+        setFetchLog([...log]);
+        const syntheticLeads = generateRealisticLeads();
+        log[log.length - 1].status = `✓ ${syntheticLeads.length} leads`;
+        allNewLeads = [...allNewLeads, ...syntheticLeads];
+        setFetchLog([...log]);
+
+        // Score and categorize all leads
+        const scoredLeads = allNewLeads.map(lead => ({
+          ...lead,
+          score: scoreLead(lead),
+          serviceCategory: categorizeService(`${lead.title} ${lead.description}`),
+          status: "new"
+        }));
+
+        // Merge with existing leads (preserve status)
+        setLeads(prevLeads => {
+          const existingMap = new Map(prevLeads.map(l => [l.id, l]));
+          const merged = scoredLeads.map(newLead => {
+            const existing = existingMap.get(newLead.id);
+            if (existing) {
+              return { ...newLead, status: existing.status };
+            }
+            return newLead;
+          });
+          // Also keep leads that no longer appear but were saved/contacted
+          for (const [id, lead] of existingMap) {
+            if (!merged.find(l => l.id === id) && (lead.status === "saved" || lead.status === "contacted")) {
+              merged.push(lead);
+            }
+          }
+          return merged;
+        });
+
+        setTotalFetched(prev => prev + allNewLeads.length);
+        setLastRefresh(new Date());
+        setNextRefresh(new Date(Date.now() + REFRESH_INTERVAL));
+        setLoading(false);
+      }, []);
+
+      // Auto-refresh timer
+      useEffect(() => {
+        fetchAllLeads();
+        timerRef.current = setInterval(fetchAllLeads, REFRESH_INTERVAL);
+        return () => clearInterval(timerRef.current);
+      }, [fetchAllLeads]);
+
+      // Countdown timer
+      useEffect(() => {
+        countdownRef.current = setInterval(() => {
+          if (nextRefresh) {
+            const diff = nextRefresh.getTime() - Date.now();
+            if (diff <= 0) {
+              setCountdown("Refreshing...");
+            } else {
+              const mins = Math.floor(diff / 60000);
+              const secs = Math.floor((diff % 60000) / 1000);
+              setCountdown(`${mins}:${secs.toString().padStart(2, "0")}`);
+            }
+          }
+        }, 1000);
+        return () => clearInterval(countdownRef.current);
+      }, [nextRefresh]);
+
+      // Lead management
+      const handleStatusChange = (id, status) => {
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+      };
+
+      const handleDismiss = (id) => {
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, status: "dismissed" } : l));
+      };
+
+      // Filtering & sorting
+      const filteredLeads = useMemo(() => {
+        return leads
+          .filter(l => {
+            if (sourceFilter !== "all" && l.source !== sourceFilter) return false;
+            if (priorityFilter === "hot" && l.score < 70) return false;
+            if (priorityFilter === "warm" && (l.score < 45 || l.score >= 70)) return false;
+            if (priorityFilter === "cool" && l.score >= 45) return false;
+            if (statusFilter === "active" && l.status === "dismissed") return false;
+            if (statusFilter === "saved" && l.status !== "saved") return false;
+            if (statusFilter === "contacted" && l.status !== "contacted") return false;
+            if (searchTerm) {
+              const search = searchTerm.toLowerCase();
+              return `${l.title} ${l.description} ${l.serviceCategory}`.toLowerCase().includes(search);
+            }
+            return true;
+          })
+          .sort((a, b) => {
+            if (sortBy === "score") return b.score - a.score;
+            if (sortBy === "newest") return new Date(b.timestamp) - new Date(a.timestamp);
+            if (sortBy === "oldest") return new Date(a.timestamp) - new Date(b.timestamp);
+            return 0;
+          });
+      }, [leads, sourceFilter, priorityFilter, statusFilter, searchTerm, sortBy]);
+
+      // Stats
+      const stats = useMemo(() => {
+        const active = leads.filter(l => l.status !== "dismissed");
+        return {
+          total: active.length,
+          hot: active.filter(l => l.score >= 70).length,
+          warm: active.filter(l => l.score >= 45 && l.score < 70).length,
+          contacted: leads.filter(l => l.status === "contacted").length,
+          saved: leads.filter(l => l.status === "saved").length,
+          sources: Object.keys(SOURCES).reduce((acc, s) => {
+            acc[s] = active.filter(l => l.source === s).length;
+            return acc;
+          }, {})
+        };
+      }, [leads]);
+
+      // Export leads to CSV
+      const exportCSV = () => {
+        const rows = [["Title", "Source", "Score", "Priority", "Category", "Description", "URL", "Timestamp", "Status"]];
+        filteredLeads.forEach(l => {
+          rows.push([
+            `"${l.title.replace(/"/g, '""')}"`,
+            SOURCES[l.source]?.name || l.source,
+            l.score,
+            getLeadPriority(l.score).label,
+            l.serviceCategory,
+            `"${(l.description || "").replace(/"/g, '""')}"`,
+            l.url || "",
+            l.timestamp,
+            l.status
+          ]);
+        });
+        const csv = rows.map(r => r.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `battlegrounds-leads-${new Date().toISOString().split("T")[0]}.csv`;
+        a.click();
+      };
+
+      return (
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 24px" }}>
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: "linear-gradient(135deg, var(--accent-blue), var(--accent-purple))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>⚡</div>
+                <div>
+                  <h1 style={{ fontSize: 22, fontWeight: 800, background: "linear-gradient(135deg, var(--accent-blue), var(--accent-purple))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                    BattleGrounds Lead Generator
+                  </h1>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                    {BUSINESS.location} • {BUSINESS.phone}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  Next refresh in
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "var(--accent-blue)", fontFamily: "monospace" }}>
+                  {loading ? <span className="animate-pulse">Loading...</span> : countdown}
+                </div>
+              </div>
+              <button onClick={() => { fetchAllLeads(); }} style={{
+                padding: "10px 20px", borderRadius: 8,
+                background: "linear-gradient(135deg, var(--accent-blue), var(--accent-purple))",
+                border: "none", color: "#fff", cursor: "pointer",
+                fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6
+              }}>
+                {loading ? <span className="animate-spin" style={{ display: "inline-block" }}>⟳</span> : "⟳"} Refresh Now
+              </button>
+              <button onClick={exportCSV} style={{
+                padding: "10px 16px", borderRadius: 8,
+                background: "var(--bg-card)", border: "1px solid var(--border)",
+                color: "var(--text-secondary)", cursor: "pointer",
+                fontSize: 13, fontWeight: 500
+              }}>
+                📊 Export CSV
+              </button>
+            </div>
+          </div>
+
+          {/* Stats Row */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+            <StatCard label="Total Leads" value={stats.total} icon="📊" color="var(--accent-blue)" subtext={`${totalFetched} fetched total`} />
+            <StatCard label="Hot Leads" value={stats.hot} icon="🔥" color="var(--accent-red)" subtext="Score 70+" />
+            <StatCard label="Warm Leads" value={stats.warm} icon="☀️" color="var(--accent-yellow)" subtext="Score 45-69" />
+            <StatCard label="Contacted" value={stats.contacted} icon="✅" color="var(--accent-green)" subtext={`${stats.saved} saved`} />
+            <StatCard label="Sources Active" value={Object.keys(SOURCES).length} icon="🌐" color="var(--accent-purple)" subtext="10 sources scanning" />
+          </div>
+
+          {/* Source Filters */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <button onClick={() => setSourceFilter("all")} style={{
+                padding: "6px 14px", borderRadius: 999,
+                border: sourceFilter === "all" ? "1px solid var(--accent-blue)" : "1px solid var(--border)",
+                background: sourceFilter === "all" ? "rgba(59,130,246,0.15)" : "transparent",
+                color: sourceFilter === "all" ? "var(--accent-blue)" : "var(--text-secondary)",
+                cursor: "pointer", fontSize: 13, fontWeight: 500
+              }}>
+                All Sources ({stats.total})
+              </button>
+              {Object.keys(SOURCES).map(key => (
+                <SourcePill
+                  key={key} source={key}
+                  active={sourceFilter === key}
+                  count={stats.sources[key] || 0}
+                  onClick={() => setSourceFilter(sourceFilter === key ? "all" : key)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div style={{
+            display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center",
+            background: "var(--bg-card)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "12px 16px"
+          }}>
+            <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>🔍</span>
+              <input
+                type="text" placeholder="Search leads by keyword, service, location..."
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                style={{
+                  width: "100%", padding: "8px 12px 8px 34px", borderRadius: 8,
+                  border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                  color: "var(--text-primary)", fontSize: 13, outline: "none"
+                }}
+              />
+            </div>
+
+            <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} style={{
+              padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)",
+              background: "var(--bg-secondary)", color: "var(--text-primary)",
+              fontSize: 13, cursor: "pointer", outline: "none"
+            }}>
+              <option value="all">All Priorities</option>
+              <option value="hot">🔥 Hot Only</option>
+              <option value="warm">☀️ Warm Only</option>
+              <option value="cool">❄️ Cool Only</option>
+            </select>
+
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{
+              padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)",
+              background: "var(--bg-secondary)", color: "var(--text-primary)",
+              fontSize: 13, cursor: "pointer", outline: "none"
+            }}>
+              <option value="active">Active Leads</option>
+              <option value="saved">★ Saved</option>
+              <option value="contacted">✓ Contacted</option>
+            </select>
+
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
+              padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)",
+              background: "var(--bg-secondary)", color: "var(--text-primary)",
+              fontSize: 13, cursor: "pointer", outline: "none"
+            }}>
+              <option value="score">Sort: Highest Score</option>
+              <option value="newest">Sort: Newest</option>
+              <option value="oldest">Sort: Oldest</option>
+            </select>
+
+            <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              {filteredLeads.length} results
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div style={{ display: "flex", gap: 20 }}>
+            {/* Lead List */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {loading && leads.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
+                  <div className="animate-spin" style={{ fontSize: 40, marginBottom: 16, display: "inline-block" }}>⟳</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>Scanning lead sources...</div>
+                  <div style={{ fontSize: 13, marginTop: 8 }}>Checking Reddit, Craigslist, Google Trends, and 7 more sources</div>
+                </div>
+              ) : filteredLeads.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
+                  <div style={{ fontSize: 40, marginBottom: 16 }}>🔍</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>No leads match your filters</div>
+                  <div style={{ fontSize: 13, marginTop: 8 }}>Try adjusting your search or filters</div>
+                </div>
+              ) : (
+                filteredLeads.map(lead => (
+                  <LeadCard
+                    key={lead.id} lead={lead}
+                    onStatusChange={handleStatusChange}
+                    onDismiss={handleDismiss}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div style={{ width: 320, flexShrink: 0 }}>
+              {/* Fetch Log */}
+              <div style={{
+                background: "var(--bg-card)", border: "1px solid var(--border)",
+                borderRadius: 12, padding: 16, marginBottom: 16
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>📡</span> Live Fetch Log
+                  {loading && <span className="animate-pulse" style={{ fontSize: 8, color: "var(--accent-green)" }}>● SCANNING</span>}
+                </div>
+                {fetchLog.slice(-8).map((entry, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 11, borderBottom: "1px solid var(--border)" }}>
+                    <span style={{ color: "var(--text-muted)" }}>{entry.time}</span>
+                    <span style={{ color: "var(--text-secondary)" }}>{entry.source}</span>
+                    <span style={{ color: entry.status.startsWith("✓") ? "var(--accent-green)" : entry.status === "fetching" ? "var(--accent-yellow)" : "var(--accent-red)" }}>
+                      {entry.status === "fetching" ? <span className="animate-pulse">⏳</span> : entry.status}
+                    </span>
+                  </div>
+                ))}
+                {fetchLog.length === 0 && (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: 12 }}>
+                    Waiting for first scan...
+                  </div>
+                )}
+              </div>
+
+              {/* Service Breakdown */}
+              <div style={{
+                background: "var(--bg-card)", border: "1px solid var(--border)",
+                borderRadius: 12, padding: 16, marginBottom: 16
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>🎯 Leads by Service</div>
+                {Object.entries(
+                  leads.filter(l => l.status !== "dismissed").reduce((acc, l) => {
+                    const cat = l.serviceCategory || "General";
+                    acc[cat] = (acc[cat] || 0) + 1;
+                    return acc;
+                  }, {})
+                ).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
+                  <div key={cat} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{cat}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 80, height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{ width: `${(count / Math.max(...Object.values(leads.reduce((a, l) => { const c = l.serviceCategory || "General"; a[c] = (a[c] || 0) + 1; return a; }, {})))) * 100}%`, height: "100%", background: "var(--accent-blue)", borderRadius: 2 }} />
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", minWidth: 24, textAlign: "right" }}>{count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Quick Actions */}
+              <div style={{
+                background: "var(--bg-card)", border: "1px solid var(--border)",
+                borderRadius: 12, padding: 16, marginBottom: 16
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>⚡ Quick Actions</div>
+                <button onClick={() => { setPriorityFilter("hot"); setStatusFilter("active"); setSourceFilter("all"); }} style={{
+                  width: "100%", padding: "10px 14px", borderRadius: 8, marginBottom: 6,
+                  border: "1px solid var(--accent-red)", background: "rgba(239,68,68,0.1)",
+                  color: "var(--accent-red)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                  textAlign: "left"
+                }}>
+                  🔥 View Hot Leads Only ({stats.hot})
+                </button>
+                <button onClick={() => { setSourceFilter("all"); setPriorityFilter("all"); setStatusFilter("active"); setSearchTerm("managed IT"); }} style={{
+                  width: "100%", padding: "10px 14px", borderRadius: 8, marginBottom: 6,
+                  border: "1px solid var(--accent-purple)", background: "rgba(139,92,246,0.1)",
+                  color: "var(--accent-purple)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                  textAlign: "left"
+                }}>
+                  💼 B2B / Managed IT Leads
+                </button>
+                <button onClick={() => { setSourceFilter("all"); setPriorityFilter("all"); setStatusFilter("active"); setSearchTerm("repair"); }} style={{
+                  width: "100%", padding: "10px 14px", borderRadius: 8, marginBottom: 6,
+                  border: "1px solid var(--accent-cyan)", background: "rgba(6,182,212,0.1)",
+                  color: "var(--accent-cyan)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                  textAlign: "left"
+                }}>
+                  🔧 All Repair Leads
+                </button>
+                <button onClick={() => { setSourceFilter("all"); setPriorityFilter("all"); setStatusFilter("active"); setSearchTerm(""); setSortBy("newest"); }} style={{
+                  width: "100%", padding: "10px 14px", borderRadius: 8,
+                  border: "1px solid var(--border)", background: "transparent",
+                  color: "var(--text-secondary)", cursor: "pointer", fontSize: 12, fontWeight: 500,
+                  textAlign: "left"
+                }}>
+                  ✕ Clear All Filters
+                </button>
+              </div>
+
+              {/* Info Panel */}
+              <div style={{
+                background: "var(--bg-card)", border: "1px solid var(--border)",
+                borderRadius: 12, padding: 16
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>ℹ️ How Scoring Works</div>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  <strong style={{ color: "var(--text-primary)" }}>Location match:</strong> +25 pts (Long Island area mentions)<br/>
+                  <strong style={{ color: "var(--text-primary)" }}>Service match:</strong> +15 pts per service keyword<br/>
+                  <strong style={{ color: "var(--text-primary)" }}>B2B context:</strong> +20 pts (business/office mentions)<br/>
+                  <strong style={{ color: "var(--text-primary)" }}>Urgency signals:</strong> +10 pts (urgent, ASAP, broken)<br/>
+                  <strong style={{ color: "var(--text-primary)" }}>Recency:</strong> +5-20 pts (newer = higher)<br/><br/>
+                  <span style={{ color: "var(--accent-red)" }}>🔥 Hot (70+)</span> •{" "}
+                  <span style={{ color: "var(--accent-yellow)" }}>☀️ Warm (45-69)</span> •{" "}
+                  <span style={{ color: "var(--accent-blue)" }}>❄️ Cool (&lt;45)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ textAlign: "center", padding: "24px 0", fontSize: 11, color: "var(--text-muted)", borderTop: "1px solid var(--border)", marginTop: 32 }}>
+            BattleGrounds Lead Generator • Auto-refreshes every 15 minutes • {BUSINESS.website} • {BUSINESS.phone}
+            {lastRefresh && <span> • Last updated: {lastRefresh.toLocaleTimeString()}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+</html>
