@@ -149,6 +149,135 @@
     // ============================================================
     const YELP_API_KEY = "KnM0dWS6T2oF1ercvFgqBprBO3HxtUs96IE6RF09eYXxYdGGR-TzSyMN1URDXiRwaKtgsrExWcwjfHblINQ8U8juDyJFtBcXuuPCcqCWaGnCOwJ5t71XtypH6fVaXYx";
 
+    // ============================================================
+    // DEAL ANALYSIS — Buy Low / Sell High
+    // ============================================================
+    // maxBuy = highest price you should pay to still profit
+    // resell = realistic resell value after cleaning/testing
+    const DEAL_MARKET_VALUES = [
+      { keywords: ["switch oled", "nintendo switch oled"],  label: "Switch OLED",    maxBuy: 200, resell: 290 },
+      { keywords: ["nintendo switch", "switch lite"],       label: "Nintendo Switch", maxBuy: 150, resell: 220 },
+      { keywords: ["ps5", "playstation 5"],                 label: "PS5",            maxBuy: 300, resell: 400 },
+      { keywords: ["xbox series x"],                        label: "Xbox Series X",  maxBuy: 280, resell: 380 },
+      { keywords: ["xbox series s"],                        label: "Xbox Series S",  maxBuy: 160, resell: 240 },
+      { keywords: ["ps4 pro", "playstation 4 pro"],         label: "PS4 Pro",        maxBuy: 150, resell: 220 },
+      { keywords: ["ps4", "playstation 4"],                 label: "PS4",            maxBuy: 120, resell: 180 },
+      { keywords: ["xbox one x"],                           label: "Xbox One X",     maxBuy: 120, resell: 170 },
+      { keywords: ["xbox one"],                             label: "Xbox One",       maxBuy: 80,  resell: 130 },
+      { keywords: ["gaming laptop"],                        label: "Gaming Laptop",  maxBuy: 400, resell: 600 },
+      { keywords: ["macbook pro"],                          label: "MacBook Pro",    maxBuy: 450, resell: 650 },
+      { keywords: ["macbook air"],                          label: "MacBook Air",    maxBuy: 300, resell: 480 },
+      { keywords: ["macbook"],                              label: "MacBook",        maxBuy: 350, resell: 550 },
+      { keywords: ["gaming pc", "gaming desktop"],          label: "Gaming PC",      maxBuy: 350, resell: 550 },
+      { keywords: ["desktop pc", "desktop computer"],       label: "Desktop PC",     maxBuy: 200, resell: 350 },
+      { keywords: ["laptop", "notebook"],                   label: "Laptop",         maxBuy: 200, resell: 320 },
+      { keywords: ["ipad pro"],                             label: "iPad Pro",       maxBuy: 250, resell: 380 },
+      { keywords: ["ipad"],                                 label: "iPad",           maxBuy: 150, resell: 250 },
+    ];
+
+    // Extract asking price from listing text — handles $100, 100 dollars, asking 150, obo, etc.
+    function extractPrice(text) {
+      const lower = text.toLowerCase();
+      const patterns = [
+        /\$\s*(\d{1,4}(?:,\d{3})?)/,
+        /asking\s*\$?\s*(\d{1,4})/i,
+        /price[:\s]+\$?\s*(\d{1,4})/i,
+        /(\d{1,4})\s*(?:dollars?|obo|firm|or\s+best)/i,
+      ];
+      for (const pattern of patterns) {
+        const match = lower.match(pattern);
+        if (match) {
+          const price = parseInt(match[1].replace(/,/g, ""));
+          if (price >= 10 && price <= 4000) return price;
+        }
+      }
+      return null;
+    }
+
+    // Detect Windows 11 compatibility from processor mentions
+    function checkWin11Compat(text) {
+      const lower = text.toLowerCase();
+      const compatKeywords = [
+        "windows 11", "win11",
+        "i5-8", "i5-9", "i5-10", "i5-11", "i5-12", "i5-13", "i5-14",
+        "i7-8", "i7-9", "i7-10", "i7-11", "i7-12", "i7-13", "i7-14",
+        "i9-9", "i9-10", "i9-11", "i9-12", "i9-13", "i9-14",
+        "8th gen", "9th gen", "10th gen", "11th gen", "12th gen", "13th gen",
+        "ryzen 5", "ryzen 7", "ryzen 9",
+        "m1", "m2", "m3",   // Apple Silicon — not W11 but high resell
+        "tpm 2.0", "tpm2"
+      ];
+      return compatKeywords.some(kw => lower.includes(kw));
+    }
+
+    // Analyze a listing and return deal info if it matches a known item
+    function analyzeDeal(lead) {
+      const text = `${lead.title} ${lead.description}`.toLowerCase();
+
+      // Find matching item (check longer keyword strings first to avoid false matches)
+      let matched = null;
+      for (const item of DEAL_MARKET_VALUES) {
+        if (item.keywords.some(kw => text.includes(kw))) {
+          matched = item;
+          break;
+        }
+      }
+      if (!matched) return null;
+
+      const askingPrice = extractPrice(text);
+      const win11Compat = checkWin11Compat(text);
+
+      if (!askingPrice) {
+        return {
+          itemType: matched.label,
+          askingPrice: null,
+          maxBuy: matched.maxBuy,
+          resell: matched.resell,
+          potentialProfit: matched.resell - matched.maxBuy,
+          isDeal: false,
+          priceKnown: false,
+          win11Compat,
+          note: `Ask for price. Target max $${matched.maxBuy}, resell ~$${matched.resell} (profit ~$${matched.resell - matched.maxBuy})`
+        };
+      }
+
+      const profit = matched.resell - askingPrice;
+      const isDeal = askingPrice <= matched.maxBuy && profit >= 40;
+
+      return {
+        itemType: matched.label,
+        askingPrice,
+        maxBuy: matched.maxBuy,
+        resell: matched.resell,
+        potentialProfit: profit,
+        isDeal,
+        priceKnown: true,
+        win11Compat,
+        note: isDeal
+          ? `✅ Buy for $${askingPrice} → resell ~$${matched.resell} = ~$${profit} profit`
+          : `⚠️ Asking $${askingPrice} — max buy is $${matched.maxBuy} to hit target margin`
+      };
+    }
+
+    // Score a deal lead separately from regular leads
+    function scoreDeal(lead) {
+      const deal = lead.dealInfo;
+      if (!deal) return 20;
+      let score = 25;
+      if (deal.isDeal) score += 40;                         // Confirmed profitable
+      if (deal.priceKnown && deal.potentialProfit > 100) score += 15;
+      if (deal.priceKnown && deal.potentialProfit > 150) score += 10;
+      if (deal.win11Compat) score += 10;                    // W11 compatible fetches more $
+      if (lead.isLocal) score += 15;
+      if (lead.timestamp) {
+        const hoursAgo = (Date.now() - new Date(lead.timestamp).getTime()) / 3600000;
+        if (hoursAgo < 3) score += 20;
+        else if (hoursAgo < 12) score += 12;
+        else if (hoursAgo < 48) score += 6;
+      }
+      return Math.min(score, 100);
+    }
+
     const SOURCES = {
       reddit: {
         name: "Reddit",
@@ -156,11 +285,7 @@
         color: "#FF4500",
         description: "Local subreddit posts & tech help requests",
         url: "https://www.reddit.com/r/longisland/search/?q=computer+repair+OR+IT+services&sort=new",
-        subreddits: [
-          "longisland", "techsupport", "computerrepair", "buildapc",
-          "pcgaming", "iphonehelp", "applehelp", "consolerepair",
-          "smallbusiness", "msp", "sysadmin"
-        ]
+        subreddits: ["longisland", "suffolkcounty"]   // LOCAL only
       },
       craigslist: {
         name: "Craigslist",
@@ -183,6 +308,13 @@
         color: "#D32323",
         description: "Local businesses — potential B2B managed IT clients",
         url: "https://www.yelp.com/search?find_desc=computer+repair&find_loc=Shirley%2C+NY+11967"
+      },
+      deals: {
+        name: "Deals",
+        icon: "💰",
+        color: "#10b981",
+        description: "Craigslist listings to buy & resell for profit",
+        url: "https://longisland.craigslist.org/search/sya"
       }
     };
 
@@ -260,17 +392,21 @@
 
     // Words that indicate a lead is completely unrelated to our services
     const IRRELEVANT_KEYWORDS = [
-      "auto repair", "car repair", "oil change", "tire", "mechanic", "transmission",
-      "plumber", "plumbing", "hvac", "roofing", "landscaping", "lawn",
-      "electrician", "electrical wiring", "solar panel",
+      "auto repair", "car repair", "oil change", "tire shop", "mechanic", "transmission repair",
+      "plumber", "plumbing leak", "hvac repair", "roofing", "landscaping", "lawn care",
+      "electrician", "electrical wiring", "solar panel installation",
       "catering", "cleaning service", "moving company",
       "dog grooming", "pet sitting", "childcare", "babysitter",
-      "beauty salon", "nail salon", "barber",
-      "real estate agent", "mortgage", "home insurance"
+      "beauty salon", "nail salon", "barber shop"
+      // NOTE: real estate, law, dental, medical, insurance, accounting are all
+      // VALID B2B managed IT leads — do NOT filter those out
     ];
 
     function isRelevantLead(lead) {
       const text = `${lead.title} ${lead.description}`.toLowerCase();
+
+      // Always keep deal leads — they're pre-qualified by analyzeDeal()
+      if (lead.source === "deals" || lead.isDealLead) return true;
 
       // Always keep B2B Yelp leads (they're pre-filtered by category)
       if (lead.source === "yelp") return true;
@@ -311,11 +447,12 @@
     // ============================================================
     async function fetchRedditLeads() {
       const leads = [];
-      const subreddits = ["longisland", "techsupport", "computerrepair", "consolerepair", "iphonehelp", "smallbusiness"];
+      // Local Long Island subreddits ONLY — no general tech subs
+      const subreddits = ["longisland", "suffolkcounty"];
 
       for (const sub of subreddits) {
         try {
-          const searchTerms = ["repair", "broken computer", "IT help", "tech support", "fix my"];
+          const searchTerms = ["computer repair", "phone repair", "console repair", "IT services", "laptop broken", "screen cracked", "tech support", "broken ps4", "broken xbox", "broken switch"];
           const term = searchTerms[Math.floor(Math.random() * searchTerms.length)];
           const resp = await fetch(
             `https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(term)}&sort=new&t=week&limit=10`,
@@ -380,6 +517,59 @@
           }
         } catch (e) {
           console.log("Craigslist fetch error:", e.message);
+        }
+      }
+      return leads;
+    }
+
+    async function fetchCraigslistDeals() {
+      const leads = [];
+      // Craigslist categories: sya=computers by owner, vga=video games, ela=electronics
+      const feeds = [
+        { url: "https://longisland.craigslist.org/search/sya?format=rss&max_price=500", cat: "Computers" },
+        { url: "https://longisland.craigslist.org/search/vga?format=rss&max_price=400", cat: "Game Consoles" },
+        { url: "https://longisland.craigslist.org/search/ela?format=rss&max_price=500", cat: "Electronics" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&max_price=350&query=nintendo+switch", cat: "Nintendo Switch" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&max_price=400&query=ps5+OR+ps4", cat: "PlayStation" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&max_price=400&query=xbox", cat: "Xbox" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&max_price=400&query=laptop+windows", cat: "Laptops" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&max_price=400&query=macbook", cat: "MacBook" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&max_price=400&query=gaming+pc+OR+desktop+computer", cat: "Desktops" },
+        { url: "https://longisland.craigslist.org/search/sss?format=rss&max_price=300&query=ipad", cat: "iPad" },
+      ];
+
+      const seen = new Set();
+      for (const feed of feeds) {
+        try {
+          const resp = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`);
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          if (data?.items) {
+            for (const item of data.items) {
+              const itemKey = item.link || item.title;
+              if (seen.has(itemKey)) continue;
+              seen.add(itemKey);
+
+              const desc = item.description?.replace(/<[^>]*>/g, '') || "";
+              const dealInfo = analyzeDeal({ title: item.title, description: desc });
+              if (!dealInfo) continue; // Not a recognized item type — skip
+
+              leads.push({
+                id: `deal-${btoa(itemKey).substring(0, 24)}`,
+                source: "deals",
+                title: `💰 ${item.title}`,
+                description: desc.substring(0, 300),
+                url: item.link,
+                timestamp: item.pubDate,
+                isLocal: true,
+                category: feed.cat,
+                isDealLead: true,
+                dealInfo,
+              });
+            }
+          }
+        } catch (e) {
+          console.log("Craigslist Deals fetch error:", e.message);
         }
       }
       return leads;
@@ -598,11 +788,16 @@
         if (leadUrl) window.open(leadUrl, '_blank', 'noopener,noreferrer');
       };
 
+      const deal = lead.dealInfo;
+      const isDealCard = lead.isDealLead && deal;
+      const dealBorderColor = deal?.isDeal ? "#10b981" : deal ? "#f59e0b" : "#10b981";
+
       return (
         <div className="animate-slide-in" style={{
-          background: "var(--bg-card)", border: lead.isNew ? `1px solid ${source?.color || "var(--accent-blue)"}50` : "1px solid var(--border)",
+          background: isDealCard ? "linear-gradient(135deg, #0a1a12, var(--bg-card))" : "var(--bg-card)",
+          border: isDealCard ? `1px solid ${dealBorderColor}40` : (lead.isNew ? `1px solid ${source?.color || "var(--accent-blue)"}50` : "1px solid var(--border)"),
           borderRadius: 12, padding: "16px 20px", marginBottom: 8,
-          borderLeft: `3px solid ${priority.color}`,
+          borderLeft: `3px solid ${isDealCard ? dealBorderColor : priority.color}`,
           transition: "all 0.2s", cursor: "pointer",
           opacity: lead.status === "dismissed" ? 0.5 : 1
         }}
@@ -614,9 +809,21 @@
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 16 }}>{source?.icon}</span>
-                <Badge color={priority.color} bg={priority.bg}>{priority.label} • {lead.score}</Badge>
+                {isDealCard ? (
+                  deal.isDeal
+                    ? <Badge color="#10b981" bg="rgba(16,185,129,0.2)">💰 HOT DEAL</Badge>
+                    : <Badge color="#f59e0b" bg="rgba(245,158,11,0.15)">💰 DEAL</Badge>
+                ) : (
+                  <Badge color={priority.color} bg={priority.bg}>{priority.label} • {lead.score}</Badge>
+                )}
                 <Badge color={source?.color || "#888"} bg={`${source?.color || "#888"}15`}>{source?.name}</Badge>
-                {lead.serviceCategory && lead.serviceCategory !== "General Tech" && (
+                {isDealCard && deal.itemType && (
+                  <Badge color="#10b981" bg="rgba(16,185,129,0.1)">{deal.itemType}</Badge>
+                )}
+                {isDealCard && deal.win11Compat && (
+                  <Badge color="#3b82f6" bg="rgba(59,130,246,0.15)">🪟 Win11 Ready</Badge>
+                )}
+                {!isDealCard && lead.serviceCategory && lead.serviceCategory !== "General Tech" && (
                   <Badge color="var(--accent-cyan)" bg="rgba(6,182,212,0.15)">{lead.serviceCategory}</Badge>
                 )}
                 {lead.isNew && <Badge color="var(--accent-green)" bg="rgba(16,185,129,0.15)">NEW</Badge>}
@@ -643,6 +850,44 @@
               {lead.source === "yelp" && lead.phone && (
                 <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent-green)", fontWeight: 600 }}>
                   📞 {lead.phone}
+                </div>
+              )}
+              {/* Deal info panel */}
+              {isDealCard && deal && (
+                <div style={{
+                  marginTop: 10, padding: "10px 12px", borderRadius: 8,
+                  background: deal.isDeal ? "rgba(16,185,129,0.08)" : "rgba(245,158,11,0.06)",
+                  border: `1px solid ${deal.isDeal ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}`
+                }}>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 6 }}>
+                    {deal.priceKnown ? (
+                      <>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>Asking</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: deal.isDeal ? "#10b981" : "#f59e0b" }}>${deal.askingPrice}</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>Resell ~</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)" }}>${deal.resell}</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>Profit ~</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: deal.potentialProfit >= 40 ? "#10b981" : "#ef4444" }}>
+                            {deal.potentialProfit >= 0 ? "+" : ""}${deal.potentialProfit}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                          <strong>Target:</strong> Max buy $${deal.maxBuy} → Resell ~$${deal.resell} (~$${deal.potentialProfit} profit)
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: deal.isDeal ? "#10b981" : "var(--text-secondary)" }}>
+                    {deal.note}
+                  </div>
                 </div>
               )}
             </div>
@@ -848,14 +1093,29 @@
         }
         setFetchLog([...log]);
 
+        // Fetch Craigslist Deals (buy & resell opportunities)
+        log.push({ time: new Date().toLocaleTimeString(), source: "Deals (CL)", status: "fetching" });
+        setFetchLog([...log]);
+        try {
+          const dealLeads = await fetchCraigslistDeals();
+          log[log.length - 1].status = `✓ ${dealLeads.length} deals`;
+          allNewLeads = [...allNewLeads, ...dealLeads];
+        } catch (e) {
+          log[log.length - 1].status = "✗ Error";
+          console.log("Deals fetch error:", e.message);
+        }
+        setFetchLog([...log]);
+
         // Filter irrelevant leads, then deduplicate by title fingerprint
         const relevantLeads = deduplicateLeads(allNewLeads.filter(isRelevantLead));
 
         // Score and categorize all leads
         const scoredLeads = relevantLeads.map(lead => ({
           ...lead,
-          score: scoreLead(lead),
-          serviceCategory: categorizeService(`${lead.title} ${lead.description}`),
+          score: lead.isDealLead ? scoreDeal(lead) : scoreLead(lead),
+          serviceCategory: lead.isDealLead
+            ? `Deal: ${lead.dealInfo?.itemType || "Electronics"}`
+            : categorizeService(`${lead.title} ${lead.description}`),
           status: "new"
         }));
 
@@ -976,12 +1236,15 @@
       // Stats
       const stats = useMemo(() => {
         const active = leads.filter(l => l.status !== "dismissed");
+        const deals = active.filter(l => l.isDealLead);
         return {
           total: active.length,
           hot: active.filter(l => l.score >= 70).length,
           warm: active.filter(l => l.score >= 45 && l.score < 70).length,
           contacted: leads.filter(l => l.status === "contacted").length,
           saved: leads.filter(l => l.status === "saved").length,
+          deals: deals.length,
+          hotDeals: deals.filter(l => l.dealInfo?.isDeal).length,
           sources: Object.keys(SOURCES).reduce((acc, s) => {
             acc[s] = active.filter(l => l.source === s).length;
             return acc;
@@ -1071,7 +1334,7 @@
           <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             <StatCard label="Total Leads" value={stats.total} icon="📊" color="var(--accent-blue)" subtext={`${totalFetched} fetched total`} />
             <StatCard label="Hot Leads" value={stats.hot} icon="🔥" color="var(--accent-red)" subtext="Score 70+" />
-            <StatCard label="Warm Leads" value={stats.warm} icon="☀️" color="var(--accent-yellow)" subtext="Score 45-69" />
+            <StatCard label="💰 Deals Found" value={stats.deals} icon="💰" color="#10b981" subtext={`${stats.hotDeals} confirmed profit`} />
             <StatCard label="Contacted" value={stats.contacted} icon="✅" color="var(--accent-green)" subtext={`${stats.saved} saved`} />
             <StatCard label="Sources Active" value={Object.keys(SOURCES).length} icon="🌐" color="var(--accent-purple)" subtext="Real sources only" />
           </div>
@@ -1193,7 +1456,7 @@
                 <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
                   <div className="animate-spin" style={{ fontSize: 40, marginBottom: 16, display: "inline-block" }}>⟳</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>Scanning lead sources...</div>
-                  <div style={{ fontSize: 13, marginTop: 8 }}>Fetching from Reddit, Craigslist, Yelp, and Google Trends</div>
+                  <div style={{ fontSize: 13, marginTop: 8 }}>Fetching from Reddit (Long Island), Craigslist, Yelp, Google Trends + scanning deals...</div>
                 </div>
               ) : filteredLeads.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
@@ -1270,6 +1533,14 @@
                 borderRadius: 12, padding: 16, marginBottom: 16
               }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>⚡ Quick Actions</div>
+                <button onClick={() => { setSourceFilter("deals"); setPriorityFilter("all"); setStatusFilter("active"); setSearchTerm(""); setSortBy("score"); }} style={{
+                  width: "100%", padding: "10px 14px", borderRadius: 8, marginBottom: 6,
+                  border: "1px solid #10b981", background: "rgba(16,185,129,0.1)",
+                  color: "#10b981", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                  textAlign: "left"
+                }}>
+                  💰 View All Deals ({stats.deals}) — {stats.hotDeals} confirmed
+                </button>
                 <button onClick={() => { setPriorityFilter("hot"); setStatusFilter("active"); setSourceFilter("all"); }} style={{
                   width: "100%", padding: "10px 14px", borderRadius: 8, marginBottom: 6,
                   border: "1px solid var(--accent-red)", background: "rgba(239,68,68,0.1)",
@@ -1304,6 +1575,40 @@
                 </button>
               </div>
 
+              {/* Facebook Marketplace Manual Links */}
+              <div style={{
+                background: "var(--bg-card)", border: "1px solid rgba(24,119,242,0.4)",
+                borderRadius: 12, padding: 16, marginBottom: 16
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: "#1877f2" }}>
+                  📘 Facebook Marketplace
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
+                  FB Marketplace requires login — browse manually with these pre-filtered links:
+                </div>
+                {[
+                  { label: "Nintendo Switch (Long Island)", url: "https://www.facebook.com/marketplace/longisland/search/?query=nintendo%20switch&exact=false" },
+                  { label: "PS4 / PS5 Deals", url: "https://www.facebook.com/marketplace/longisland/search/?query=ps4%20ps5&exact=false" },
+                  { label: "Xbox Consoles", url: "https://www.facebook.com/marketplace/longisland/search/?query=xbox&exact=false" },
+                  { label: "Laptops Under $300", url: "https://www.facebook.com/marketplace/longisland/search/?query=laptop&exact=false&minPrice=0&maxPrice=300" },
+                  { label: "Gaming PCs / Desktops", url: "https://www.facebook.com/marketplace/longisland/search/?query=gaming+pc+desktop&exact=false" },
+                  { label: "iPads For Sale", url: "https://www.facebook.com/marketplace/longisland/search/?query=ipad&exact=false" },
+                  { label: "MacBooks", url: "https://www.facebook.com/marketplace/longisland/search/?query=macbook&exact=false" },
+                ].map(link => (
+                  <a key={link.label} href={link.url} target="_blank" rel="noopener noreferrer" style={{
+                    display: "block", padding: "6px 10px", borderRadius: 6, marginBottom: 4,
+                    background: "rgba(24,119,242,0.08)", border: "1px solid rgba(24,119,242,0.2)",
+                    color: "#1877f2", fontSize: 11, fontWeight: 500, textDecoration: "none",
+                    transition: "all 0.15s"
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(24,119,242,0.15)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(24,119,242,0.08)"}
+                  >
+                    ↗ {link.label}
+                  </a>
+                ))}
+              </div>
+
               {/* Info Panel */}
               <div style={{
                 background: "var(--bg-card)", border: "1px solid var(--border)",
@@ -1326,7 +1631,7 @@
 
           {/* Footer */}
           <div style={{ textAlign: "center", padding: "24px 0", fontSize: 11, color: "var(--text-muted)", borderTop: "1px solid var(--border)", marginTop: 32 }}>
-            BattleGrounds Lead Generator • Auto-refreshes every 15 minutes • {BUSINESS.website} • {BUSINESS.phone}
+            BattleGrounds Lead Generator • 5 real sources (Reddit LI, Craigslist, Yelp, Google Trends, Deals) • Auto-refreshes every 15 min • {BUSINESS.website} • {BUSINESS.phone}
             {lastRefresh && <span> • Last updated: {lastRefresh.toLocaleTimeString()}</span>}
           </div>
         </div>
