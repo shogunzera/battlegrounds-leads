@@ -145,8 +145,10 @@
     ];
 
     // ============================================================
-    // LEAD SOURCE CONFIGURATIONS
+    // LEAD SOURCE CONFIGURATIONS (Real sources only)
     // ============================================================
+    const YELP_API_KEY = "KnM0dWS6T2oF1ercvFgqBprBO3HxtUs96IE6RF09eYXxYdGGR-TzSyMN1URDXiRwaKtgsrExWcwjfHblINQ8U8juDyJFtBcXuuPCcqCWaGnCOwJ5t71XtypH6fVaXYx";
+
     const SOURCES = {
       reddit: {
         name: "Reddit",
@@ -168,61 +170,19 @@
         url: "https://longisland.craigslist.org/search/sss?query=computer+repair",
         regions: ["longisland", "newyork"]
       },
-      nextdoor: {
-        name: "Nextdoor / Community",
-        icon: "🏘️",
-        color: "#10b981",
-        description: "Neighborhood help requests & recommendations",
-        url: "https://nextdoor.com/find-business/computer-repair/shirley-ny/"
-      },
       google: {
-        name: "Google Business",
+        name: "Google Trends",
         icon: "🔍",
         color: "#4285F4",
-        description: "Local search trends & business queries",
+        description: "Trending tech repair searches in NY",
         url: "https://trends.google.com/trends/explore?geo=US-NY&q=computer%20repair%20long%20island"
       },
-      facebook: {
-        name: "Facebook Groups",
-        icon: "📘",
-        color: "#1877F2",
-        description: "Local community group posts",
-        url: "https://www.facebook.com/groups/search/groups/?q=long%20island%20computer%20repair"
-      },
       yelp: {
-        name: "Yelp / Reviews",
+        name: "Yelp",
         icon: "⭐",
         color: "#D32323",
-        description: "Review sentiment & competitor gaps",
+        description: "Local businesses — potential B2B managed IT clients",
         url: "https://www.yelp.com/search?find_desc=computer+repair&find_loc=Shirley%2C+NY+11967"
-      },
-      twitter: {
-        name: "X / Twitter",
-        icon: "🐦",
-        color: "#1DA1F2",
-        description: "Local tweets about tech problems",
-        url: "https://x.com/search?q=%22computer%20repair%22%20%22long%20island%22&f=live"
-      },
-      linkedin: {
-        name: "LinkedIn",
-        icon: "💼",
-        color: "#0A66C2",
-        description: "Local businesses seeking IT services",
-        url: "https://www.linkedin.com/search/results/content/?keywords=IT%20services%20suffolk%20county&origin=GLOBAL_SEARCH_HEADER"
-      },
-      thumbtack: {
-        name: "Thumbtack / Angi",
-        icon: "📌",
-        color: "#009FD9",
-        description: "Service requests from lead platforms",
-        url: "https://www.thumbtack.com/ny/shirley/computer-repair/"
-      },
-      bbb: {
-        name: "BBB / Directories",
-        icon: "🏢",
-        color: "#F59E0B",
-        description: "Business directory listings & inquiries",
-        url: "https://www.bbb.org/search?find_country=US&find_entity=10126-000&find_text=computer+repair&find_loc=Shirley%2C+NY&find_type=Category"
       }
     };
 
@@ -419,111 +379,91 @@
       return leads;
     }
 
-    // ============================================================
-    // SYNTHETIC LEAD GENERATION (Simulates sources that need auth)
-    // ============================================================
-    function generateRealisticLeads() {
-      const templates = [
-        // Nextdoor / Community leads
-        {
-          source: "nextdoor",
-          templates: [
-            { title: "Anyone know a good computer repair shop nearby?", desc: "My laptop won't turn on anymore, was working fine yesterday. Looking for someone local who can take a look. Shirley/Mastic area preferred.", isLocal: true },
-            { title: "Small business IT recommendations in Suffolk County?", desc: "We're a dental office in Patchogue looking for managed IT services. Currently handling everything in-house but it's becoming too much. Need someone reliable for our 15 workstations.", isLocal: true },
-            { title: "Broken PS5 - anyone fix consoles locally?", desc: "My son's PS5 disc drive stopped reading games. Don't want to ship it to Sony and wait weeks. Any local repair options near Medford?", isLocal: true },
-            { title: "Cracked iPhone screen - where to go on LI?", desc: "Dropped my iPhone 15 Pro and the screen is completely shattered. Looking for somewhere that can fix it same day if possible. In the Brookhaven area.", isLocal: true },
-            { title: "Office network keeps going down - need IT help", desc: "Our small accounting firm in Ronkonkoma keeps losing network connection. We need someone to come assess our setup and maybe set up proper business networking.", isLocal: true },
-            { title: "Recommendation for computer virus removal?", desc: "Pretty sure my desktop has a virus - tons of popups and it's running super slow. Need someone trustworthy in the Center Moriches area.", isLocal: true },
-            { title: "New restaurant opening - need POS system setup", desc: "Opening a new restaurant in Patchogue next month. Need help setting up our POS system, security cameras, and office computers. Looking for a local IT company.", isLocal: true },
-            { title: "Water damaged MacBook Pro - any hope?", desc: "Spilled coffee on my MacBook Pro. Screen went black. Has anyone had luck with local repair shops recovering water damaged laptops?", isLocal: true },
-          ]
-        },
-        // Facebook Groups leads
-        {
-          source: "facebook",
-          templates: [
-            { title: "ISO computer repair - Mastic Beach area", desc: "Desktop won't boot past the Windows logo. Keeps restarting. Need someone who can come to my house or I can drop it off locally.", isLocal: true },
-            { title: "Business owners: who handles your IT?", desc: "Starting a new business in Holbrook and need to set up a proper network, file server, and workstations for 8 employees. Any recommendations for managed IT providers on Long Island?", isLocal: true },
-            { title: "Nintendo Switch won't charge", desc: "My kids' Nintendo Switch stopped charging. The port looks damaged. Anyone know where to get it fixed around here?", isLocal: true },
-            { title: "Looking for gaming PC builder on Long Island", desc: "Want to get a custom gaming PC built. Budget around $2000. Would prefer to work with a local shop rather than ordering online.", isLocal: true },
-            { title: "iPad screen replacement Suffolk County", desc: "Need the screen replaced on an iPad Pro 12.9. Apple wants $500+. Anyone know a more affordable local option?", isLocal: true },
-            { title: "Ransomware attack on our business!!", desc: "Our small business in Bay Shore just got hit with ransomware. All our files are encrypted. URGENT - need IT security help ASAP!", isLocal: true },
-          ]
-        },
-        // Yelp / Review leads
-        {
-          source: "yelp",
-          templates: [
-            { title: "Searching: Computer Repair in Shirley, NY", desc: "User searched for computer repair services near Shirley. Viewed 4 businesses. High purchase intent signal.", isLocal: true },
-            { title: "Competitor gap: Phone repair complaints in Patchogue", desc: "Multiple 1-2 star reviews for competing phone repair shops citing slow service and high prices. Opportunity to capture dissatisfied customers.", isLocal: true },
-            { title: "Trending search: 'IT support small business Suffolk County'", desc: "15% increase in searches for managed IT services in Suffolk County area over the past 2 weeks. Growing demand signal.", isLocal: true },
-            { title: "Request a Quote: Console repair in Medford", desc: "User requested quotes from electronics repair businesses in the Medford/Patchogue area for Xbox Series X repair.", isLocal: true },
-          ]
-        },
-        // Twitter / X leads
-        {
-          source: "twitter",
-          templates: [
-            { title: "@user: My laptop just died right before finals 😭", desc: "Tweeted from Long Island. User expressing frustration about broken laptop. Location: Suffolk County. High urgency signal.", isLocal: true },
-            { title: "@localshop: anyone know where to fix a PS5 on LI?", desc: "User asking followers for PlayStation 5 repair recommendations on Long Island. 3 replies, no recommendations yet.", isLocal: true },
-            { title: "@smallbizowner: Our server crashed and we lost everything", desc: "Small business owner in Islip area tweeting about server failure and data loss. Potential data recovery + managed IT lead.", isLocal: true },
-            { title: "Trending locally: #techrepair #longisland", desc: "Increased mentions of tech repair needs in the Long Island area. Multiple users seeking local repair services this week.", isLocal: true },
-          ]
-        },
-        // LinkedIn leads
-        {
-          source: "linkedin",
-          templates: [
-            { title: "New business registered: Digital Marketing Agency, Patchogue", desc: "New 12-person company just opened in Patchogue. Likely needs IT infrastructure setup, networking, and managed IT services.", isLocal: true },
-            { title: "Job posting: 'IT Manager' at Suffolk County medical office", desc: "Medical office looking to hire IT manager suggests they don't have outsourced IT. Potential managed services opportunity for a practice with 3 locations.", isLocal: true },
-            { title: "Post: 'Switching from our IT provider - any recommendations?'", desc: "Business owner in Hauppauge looking to switch managed IT providers. Currently unhappy with response times. 45 employees.", isLocal: true },
-            { title: "Company expansion: Law firm opening Ronkonkoma office", desc: "Regional law firm expanding to Suffolk County. New office will need complete IT infrastructure, compliance setup, and ongoing support.", isLocal: true },
-          ]
-        },
-        // Thumbtack / Angi leads
-        {
-          source: "thumbtack",
-          templates: [
-            { title: "Service Request: Computer repair in 11967", desc: "Customer requesting computer repair quotes in Shirley zip code. Desktop not turning on. Budget: $100-200. Timeline: This week.", isLocal: true },
-            { title: "Service Request: Office IT setup in Patchogue", desc: "New business owner needs 6 workstations set up with network, printer, and internet. Looking for ongoing IT support contract.", isLocal: true },
-            { title: "Service Request: iPhone 15 screen replacement", desc: "Customer in Mastic looking for same-day iPhone screen replacement. Willing to travel up to 15 miles.", isLocal: true },
-            { title: "Service Request: Gaming console repair - PS5", desc: "PS5 not reading discs. Customer in Medford. Has been quoted $200 elsewhere, looking for better price.", isLocal: true },
-            { title: "Service Request: Business network security audit", desc: "Real estate office in Bay Shore requesting network security assessment. 20 employees, concerned about data breaches.", isLocal: true },
-          ]
-        },
-        // BBB / Directory leads
-        {
-          source: "bbb",
-          templates: [
-            { title: "BBB Search: Computer repair services, Suffolk County", desc: "Increased BBB searches for accredited computer repair businesses in Suffolk County. Consumer trust signal indicates high-intent buyers.", isLocal: true },
-            { title: "New business filing: E-commerce startup, Bohemia", desc: "New LLC registered in Bohemia for e-commerce business. Will likely need IT infrastructure, web hosting support, and workstation setup.", isLocal: true },
-            { title: "Chamber of Commerce: Networking event leads", desc: "Suffolk County Chamber hosting small business tech expo. 50+ local businesses attending - potential managed IT prospects.", isLocal: true },
-          ]
-        }
+
+    async function fetchYelpLeads() {
+      const leads = [];
+
+      // Search for local businesses likely to need IT/repair services
+      // These become B2B managed IT leads and consumer repair leads
+      const searches = [
+        { term: "dental office",        label: "Medical/Dental",   b2b: true  },
+        { term: "law firm",             label: "Legal",            b2b: true  },
+        { term: "accounting",           label: "Financial",        b2b: true  },
+        { term: "real estate office",   label: "Real Estate",      b2b: true  },
+        { term: "restaurant",           label: "Restaurant",       b2b: true  },
+        { term: "auto repair shop",     label: "Auto Shop",        b2b: true  },
+        { term: "retail store",         label: "Retail",           b2b: true  },
+        { term: "computer repair",      label: "Computer Repair",  b2b: false },
+        { term: "phone repair",         label: "Phone Repair",     b2b: false },
+        { term: "electronics repair",   label: "Electronics",      b2b: false },
       ];
 
-      const allLeads = [];
-      const now = Date.now();
-
-      for (const sourceGroup of templates) {
-        for (const template of sourceGroup.templates) {
-          // Randomize timestamps within the last 72 hours
-          const hoursAgo = Math.random() * 72;
-          const timestamp = new Date(now - hoursAgo * 3600000).toISOString();
-
-          allLeads.push({
-            id: `${sourceGroup.source}-${Math.random().toString(36).substr(2, 9)}`,
-            source: sourceGroup.source,
-            title: template.title,
-            description: template.desc,
-            timestamp,
-            isLocal: template.isLocal,
-            url: SOURCES[sourceGroup.source]?.url || "#"
+      for (const search of searches) {
+        try {
+          const params = new URLSearchParams({
+            term: search.term,
+            location: "Shirley, NY",
+            radius: 24140,   // ~15 miles covers all of Suffolk County
+            limit: 8,
+            sort_by: "review_count"
           });
+
+          // corsproxy.io forwards all request headers including Authorization
+          const yelpUrl = `https://api.yelp.com/v3/businesses/search?${params}`;
+          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yelpUrl)}`;
+
+          const resp = await fetch(proxyUrl, {
+            headers: {
+              "Authorization": `Bearer ${YELP_API_KEY}`,
+              "Accept": "application/json"
+            }
+          });
+
+          if (!resp.ok) {
+            console.log(`Yelp error ${resp.status} for "${search.term}"`);
+            continue;
+          }
+
+          const data = await resp.json();
+
+          if (data?.businesses) {
+            for (const biz of data.businesses) {
+              const city    = biz.location?.city || "";
+              const state   = biz.location?.state || "";
+              const address = biz.location?.display_address?.join(", ") || "";
+              const cats    = biz.categories?.map(c => c.title).join(", ") || "";
+              const phone   = biz.display_phone || biz.phone || "Not listed";
+
+              const title = search.b2b
+                ? `💼 B2B Lead: ${biz.name} (${search.label})`
+                : `🔍 Competitor/Market: ${biz.name} (${search.label})`;
+
+              const desc = search.b2b
+                ? `${search.label} business in ${city}, ${state}. Categories: ${cats}. Rating: ${biz.rating}/5 (${biz.review_count} reviews). Address: ${address}. Phone: ${phone}. Potential managed IT or network services client.`
+                : `${search.label} business in ${city}, ${state}. Rating: ${biz.rating}/5 (${biz.review_count} reviews). Phone: ${phone}. Address: ${address}. Market signal for local repair demand in this category.`;
+
+              leads.push({
+                id: `yelp-${biz.id}`,
+                source: "yelp",
+                title,
+                description: desc,
+                url: biz.url,
+                timestamp: new Date().toISOString(),
+                isLocal: true,
+                phone: biz.phone,
+                bizName: biz.name,
+                bizCategory: search.label,
+                rating: biz.rating,
+                reviewCount: biz.review_count,
+              });
+            }
+          }
+        } catch (e) {
+          console.log(`Yelp fetch error for "${search.term}":`, e.message);
         }
       }
 
-      return allLeads;
+      return leads;
     }
 
     // ============================================================
@@ -646,6 +586,18 @@
                 {lead.subreddit && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>r/{lead.subreddit}</span>}
                 {lead.isLocal && <span style={{ fontSize: 11, color: "var(--accent-green)" }}>📍 Local</span>}
               </div>
+              {/* Show actual URL for all real leads */}
+              {leadUrl && leadUrl !== "#" && (
+                <div style={{ marginTop: 6, padding: "6px 10px", background: "var(--bg-secondary)", borderRadius: 6, fontSize: 10, color: "var(--text-muted)", wordBreak: "break-all", fontFamily: "monospace" }}>
+                  🔗 {leadUrl}
+                </div>
+              )}
+              {/* Yelp-specific: show phone if available */}
+              {lead.source === "yelp" && lead.phone && (
+                <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent-green)", fontWeight: 600 }}>
+                  📞 {lead.phone}
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
               {leadUrl && (
@@ -685,7 +637,7 @@
               <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 10 }}>
                 {lead.description}
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
                 {leadUrl && (
                   <a href={leadUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
                     padding: "6px 16px", borderRadius: 6,
@@ -701,7 +653,7 @@
                 )}
                 {lead.firstSeen && (
                   <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    First seen: {new Date(lead.firstSeen).toLocaleDateString()}
+                    📅 First seen: {new Date(lead.firstSeen).toLocaleDateString()}
                   </span>
                 )}
                 {lead.status === "contacted" && (
@@ -836,12 +788,17 @@
         }
         setFetchLog([...log]);
 
-        // Generate realistic leads from sources that need auth
-        log.push({ time: new Date().toLocaleTimeString(), source: "Community Sources", status: "fetching" });
+        // Fetch Yelp (real Fusion API — local businesses as B2B leads)
+        log.push({ time: new Date().toLocaleTimeString(), source: "Yelp", status: "fetching" });
         setFetchLog([...log]);
-        const syntheticLeads = generateRealisticLeads();
-        log[log.length - 1].status = `✓ ${syntheticLeads.length} leads`;
-        allNewLeads = [...allNewLeads, ...syntheticLeads];
+        try {
+          const yelpLeads = await fetchYelpLeads();
+          log[log.length - 1].status = `✓ ${yelpLeads.length} leads`;
+          allNewLeads = [...allNewLeads, ...yelpLeads];
+        } catch (e) {
+          log[log.length - 1].status = "✗ Error";
+          console.log("Yelp top-level error:", e.message);
+        }
         setFetchLog([...log]);
 
         // Score and categorize all leads
@@ -1037,7 +994,7 @@
             <StatCard label="Hot Leads" value={stats.hot} icon="🔥" color="var(--accent-red)" subtext="Score 70+" />
             <StatCard label="Warm Leads" value={stats.warm} icon="☀️" color="var(--accent-yellow)" subtext="Score 45-69" />
             <StatCard label="Contacted" value={stats.contacted} icon="✅" color="var(--accent-green)" subtext={`${stats.saved} saved`} />
-            <StatCard label="Sources Active" value={Object.keys(SOURCES).length} icon="🌐" color="var(--accent-purple)" subtext="All leads persisted" />
+            <StatCard label="Sources Active" value={Object.keys(SOURCES).length} icon="🌐" color="var(--accent-purple)" subtext="Real sources only" />
           </div>
 
           {/* Source Filters */}
@@ -1126,7 +1083,7 @@
                 <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
                   <div className="animate-spin" style={{ fontSize: 40, marginBottom: 16, display: "inline-block" }}>⟳</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>Scanning lead sources...</div>
-                  <div style={{ fontSize: 13, marginTop: 8 }}>Checking Reddit, Craigslist, Google Trends, and 7 more sources</div>
+                  <div style={{ fontSize: 13, marginTop: 8 }}>Fetching from Reddit, Craigslist, and Google Trends</div>
                 </div>
               ) : filteredLeads.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 60, color: "var(--text-muted)" }}>
