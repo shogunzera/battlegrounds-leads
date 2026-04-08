@@ -315,8 +315,18 @@
         color: "#10b981",
         description: "Craigslist listings to buy & resell for profit",
         url: "https://longisland.craigslist.org/search/sya"
+      },
+      facebook: {
+        name: "Facebook",
+        icon: "📘",
+        color: "#1877f2",
+        description: "Facebook Marketplace deals (requires local backend)",
+        url: "https://www.facebook.com/marketplace/longisland/"
       }
     };
+
+    // Local backend URL — the Python server running on your PC
+    const BACKEND_URL = "http://localhost:5678";
 
     // ============================================================
     // LEAD SCORING ENGINE
@@ -571,6 +581,79 @@
         } catch (e) {
           console.log("Craigslist Deals fetch error:", e.message);
         }
+      }
+      return leads;
+    }
+
+    async function fetchFBMarketplaceDeals() {
+      // Calls the local Python backend which uses your Chrome cookies to
+      // scrape Facebook Marketplace and return structured listing data.
+      const leads = [];
+      try {
+        const resp = await fetch(`${BACKEND_URL}/api/fb-deals`, {
+          signal: AbortSignal.timeout(45000)  // FB scraping can be slow
+        });
+        if (!resp.ok) throw new Error(`Backend returned ${resp.status}`);
+        const data = await resp.json();
+
+        if (!data.success) {
+          console.warn("FB backend:", data.error);
+          return [];
+        }
+
+        for (const item of (data.listings || [])) {
+          // Parse price number out of formatted string like "$120" or "Free"
+          const priceStr = (item.price || "").replace(/[^0-9]/g, "");
+          const priceNum = priceStr ? parseInt(priceStr) : null;
+
+          // Run through our deal analysis engine
+          const dealInfo = analyzeDeal({
+            title: item.title,
+            description: `${item.description || ""} ${item.title}`
+          });
+
+          // Build a price note for the card
+          let dealNote = "";
+          if (dealInfo && priceNum) {
+            const profit = dealInfo.resell - priceNum;
+            if (priceNum <= dealInfo.maxBuy && profit >= 40) {
+              dealNote = `✅ Buy at ${item.price} → resell ~$${dealInfo.resell} = ~$${profit} profit`;
+            } else {
+              dealNote = `Asking ${item.price} — max buy target $${dealInfo.maxBuy}`;
+            }
+          }
+
+          // Override dealInfo with FB's actual asking price if we have it
+          const mergedDealInfo = dealInfo ? {
+            ...dealInfo,
+            askingPrice: priceNum || dealInfo.askingPrice,
+            potentialProfit: priceNum ? (dealInfo.resell - priceNum) : dealInfo.potentialProfit,
+            isDeal: priceNum ? (priceNum <= dealInfo.maxBuy && (dealInfo.resell - priceNum) >= 40) : false,
+            priceKnown: !!priceNum,
+            note: dealNote || dealInfo.note,
+          } : null;
+
+          leads.push({
+            id: `fb-${item.id}`,
+            source: "facebook",
+            title: `📘 ${item.title}`,
+            description: item.description || `Facebook Marketplace — ${item.searchLabel}. ${item.price ? "Asking: " + item.price : "Price not listed"}`,
+            url: item.url,
+            timestamp: item.timestamp || new Date().toISOString(),
+            isLocal: true,
+            category: item.searchLabel,
+            isDealLead: true,
+            dealInfo: mergedDealInfo,
+            fbImage: item.image || null,
+            fbPrice: item.price || null,
+            fbLocation: item.location || "Long Island",
+          });
+        }
+
+        console.log(`FB Marketplace: ${leads.length} deals from backend`);
+      } catch (e) {
+        // Backend not running or unreachable — fail silently so the app still works
+        console.log("FB backend not available:", e.message, "— start backend/start.bat to enable");
       }
       return leads;
     }
@@ -1023,8 +1106,29 @@
       const [fetchLog, setFetchLog] = useState([]);
       const [showSettings, setShowSettings] = useState(false);
       const [totalFetched, setTotalFetched] = useState(savedMeta.totalFetched || 0);
+      const [backendStatus, setBackendStatus] = useState("unknown"); // "online" | "offline" | "unknown"
       const timerRef = useRef(null);
       const countdownRef = useRef(null);
+
+      // Check backend status on load and every 60 seconds
+      useEffect(() => {
+        const checkBackend = async () => {
+          try {
+            const resp = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(3000) });
+            if (resp.ok) {
+              const data = await resp.json();
+              setBackendStatus(data.fb_logged_in ? "online" : "no-session");
+            } else {
+              setBackendStatus("offline");
+            }
+          } catch {
+            setBackendStatus("offline");
+          }
+        };
+        checkBackend();
+        const t = setInterval(checkBackend, 60000);
+        return () => clearInterval(t);
+      }, []);
 
       // Persist leads to localStorage whenever they change
       useEffect(() => {
@@ -1103,6 +1207,22 @@
         } catch (e) {
           log[log.length - 1].status = "✗ Error";
           console.log("Deals fetch error:", e.message);
+        }
+        setFetchLog([...log]);
+
+        // Fetch Facebook Marketplace Deals (via local Python backend)
+        log.push({ time: new Date().toLocaleTimeString(), source: "FB Marketplace", status: "fetching" });
+        setFetchLog([...log]);
+        try {
+          const fbLeads = await fetchFBMarketplaceDeals();
+          if (fbLeads.length > 0) {
+            log[log.length - 1].status = `✓ ${fbLeads.length} deals`;
+          } else {
+            log[log.length - 1].status = "⚠ Backend offline";
+          }
+          allNewLeads = [...allNewLeads, ...fbLeads];
+        } catch (e) {
+          log[log.length - 1].status = "⚠ Backend offline";
         }
         setFetchLog([...log]);
 
@@ -1330,11 +1450,49 @@
             </div>
           </div>
 
+          {/* FB Backend Status Banner */}
+          {backendStatus !== "online" && (
+            <div style={{
+              marginBottom: 16, padding: "10px 16px", borderRadius: 10,
+              display: "flex", alignItems: "center", gap: 10,
+              background: backendStatus === "offline"
+                ? "rgba(239,68,68,0.08)"
+                : backendStatus === "no-session"
+                  ? "rgba(245,158,11,0.08)"
+                  : "rgba(59,130,246,0.06)",
+              border: backendStatus === "offline"
+                ? "1px solid rgba(239,68,68,0.25)"
+                : backendStatus === "no-session"
+                  ? "1px solid rgba(245,158,11,0.25)"
+                  : "1px solid rgba(59,130,246,0.15)"
+            }}>
+              <span style={{ fontSize: 18 }}>
+                {backendStatus === "offline" ? "📴" : backendStatus === "no-session" ? "⚠️" : "🔄"}
+              </span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: backendStatus === "offline" ? "var(--accent-red)" : "var(--accent-yellow)" }}>
+                  {backendStatus === "offline"
+                    ? "FB Marketplace backend is offline"
+                    : backendStatus === "no-session"
+                      ? "Backend running but not logged into Facebook"
+                      : "Checking backend…"}
+                </span>
+                <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>
+                  {backendStatus === "offline"
+                    ? "→ Double-click backend/start.bat to enable live Facebook Marketplace deals"
+                    : backendStatus === "no-session"
+                      ? "→ Open Chrome, log in to facebook.com, then restart start.bat"
+                      : ""}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Stats Row */}
           <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             <StatCard label="Total Leads" value={stats.total} icon="📊" color="var(--accent-blue)" subtext={`${totalFetched} fetched total`} />
             <StatCard label="Hot Leads" value={stats.hot} icon="🔥" color="var(--accent-red)" subtext="Score 70+" />
-            <StatCard label="💰 Deals Found" value={stats.deals} icon="💰" color="#10b981" subtext={`${stats.hotDeals} confirmed profit`} />
+            <StatCard label="💰 Deals Found" value={stats.deals} icon="💰" color="#10b981" subtext={`${stats.hotDeals} profitable · ${backendStatus === "online" ? "FB live" : "FB offline"}`} />
             <StatCard label="Contacted" value={stats.contacted} icon="✅" color="var(--accent-green)" subtext={`${stats.saved} saved`} />
             <StatCard label="Sources Active" value={Object.keys(SOURCES).length} icon="🌐" color="var(--accent-purple)" subtext="Real sources only" />
           </div>
@@ -1580,11 +1738,21 @@
                 background: "var(--bg-card)", border: "1px solid rgba(24,119,242,0.4)",
                 borderRadius: 12, padding: 16, marginBottom: 16
               }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: "#1877f2" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: "#1877f2", display: "flex", alignItems: "center", gap: 8 }}>
                   📘 Facebook Marketplace
+                  <span style={{
+                    fontSize: 10, padding: "2px 7px", borderRadius: 999, fontWeight: 600,
+                    background: backendStatus === "online" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.12)",
+                    color: backendStatus === "online" ? "#10b981" : "var(--accent-red)",
+                    border: `1px solid ${backendStatus === "online" ? "#10b98140" : "rgba(239,68,68,0.3)"}`
+                  }}>
+                    {backendStatus === "online" ? "● LIVE" : "● OFFLINE"}
+                  </span>
                 </div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
-                  FB Marketplace requires login — browse manually with these pre-filtered links:
+                  {backendStatus === "online"
+                    ? "✅ Backend running — FB deals appear automatically in the feed above."
+                    : "Run backend/start.bat to get live FB deals. Manual links below:"}
                 </div>
                 {[
                   { label: "Nintendo Switch (Long Island)", url: "https://www.facebook.com/marketplace/longisland/search/?query=nintendo%20switch&exact=false" },
